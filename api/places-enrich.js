@@ -1,83 +1,26 @@
 // api/places-enrich.js
-// POST { restaurants: [{name, cuisine}], city: "Chicago" }
-// Returns each restaurant enriched with Google Places photo, rating, reviews, price, address
-
-const GPLACES_KEY = process.env.GOOGLE_PLACES_KEY;
-const PLACES_BASE = 'https://places.googleapis.com/v1';
-
-const PRICE_MAP = {
-  PRICE_LEVEL_FREE: 'Free',
-  PRICE_LEVEL_INEXPENSIVE: '$',
-  PRICE_LEVEL_MODERATE: '$$',
-  PRICE_LEVEL_EXPENSIVE: '$$$',
-  PRICE_LEVEL_VERY_EXPENSIVE: '$$$$',
-};
-
-async function googlePlacesSearch(name, city) {
-  const searchRes = await fetch(`${PLACES_BASE}/places:searchText`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Goog-Api-Key': GPLACES_KEY,
-      'X-Goog-FieldMask': [
-        'places.id',
-        'places.displayName',
-        'places.rating',
-        'places.userRatingCount',
-        'places.priceLevel',
-        'places.formattedAddress',
-        'places.photos',
-        'places.currentOpeningHours',
-        'places.location',
-      ].join(','),
-    },
-    body: JSON.stringify({
-      textQuery: `${name} restaurant ${city}`,
-      maxResultCount: 1,
-      languageCode: 'en',
-    }),
-  });
-
-  if (!searchRes.ok) return null;
-  const data = await searchRes.json();
-  const place = data.places?.[0];
-  if (!place) return null;
-
-  let photoUrl = null;
-  if (place.photos?.length > 0) {
-    const photoName = place.photos[0].name;
-    photoUrl = `https://places.googleapis.com/v1/${photoName}/media?maxHeightPx=400&maxWidthPx=600&key=${GPLACES_KEY}`;
-  }
-
-  return {
-    googlePlaceId: place.id,
-    canonicalName: place.displayName?.text ?? name,
-    photo:         photoUrl,
-    rating:        place.rating ?? null,
-    reviews:       place.userRatingCount ?? null,
-    price:         PRICE_MAP[place.priceLevel] ?? null,
-    address:       place.formattedAddress ?? null,
-    latitude:      place.location?.latitude ?? null,
-    longitude:     place.location?.longitude ?? null,
-    isOpen:        place.currentOpeningHours?.openNow ?? null,
-  };
+async function getPlaceDetails(name,city,apiKey){
+  try{
+    const r=await fetch('https://places.googleapis.com/v1/places:searchText',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':apiKey,'X-Goog-FieldMask':'places.rating,places.userRatingCount,places.priceLevel,places.formattedAddress,places.currentOpeningHours,places.location,places.photos'},body:JSON.stringify({textQuery:`${name} restaurant ${city}`,maxResultCount:1})});
+    const d=await r.json();
+    const p=d.places?.[0];
+    if(!p)return null;
+    const price={'PRICE_LEVEL_INEXPENSIVE':'$','PRICE_LEVEL_MODERATE':'$$','PRICE_LEVEL_EXPENSIVE':'$$$','PRICE_LEVEL_VERY_EXPENSIVE':'$$$$'};
+    return{photo:p.photos?.[0]?.name?`https://places.googleapis.com/v1/${p.photos[0].name}/media?maxHeightPx=600&maxWidthPx=800&key=${apiKey}`:null,rating:p.rating??null,reviews:p.userRatingCount??null,price:price[p.priceLevel]??null,address:p.formattedAddress??null,isOpen:p.currentOpeningHours?.openNow??null,latitude:p.location?.latitude??null,longitude:p.location?.longitude??null};
+  }catch(e){return null;}
 }
-
-export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
-
-  const { restaurants = [], city = 'Chicago' } = req.body ?? {};
-
-  if (!GPLACES_KEY) return res.status(500).json({ error: 'GOOGLE_PLACES_KEY not configured' });
-  if (!restaurants.length) return res.status(400).json({ error: 'No restaurants provided' });
-
-  const enriched = await Promise.all(
-    restaurants.map(async (r) => {
-      const places = await googlePlacesSearch(r.name, city);
-      return { ...r, places: places ?? null };
-    })
-  );
-
-  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
-  return res.status(200).json({ enriched });
+export default async function handler(req,res){
+  res.setHeader('Access-Control-Allow-Origin','*');
+  res.setHeader('Access-Control-Allow-Headers','Content-Type');
+  if(req.method==='OPTIONS')return res.status(200).end();
+  if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
+  const pk=process.env.GOOGLE_PLACES_KEY;
+  if(!pk)return res.status(500).json({error:'GOOGLE_PLACES_KEY not set'});
+  const{restaurants,city}=req.body;
+  if(!restaurants||!city)return res.status(400).json({error:'restaurants and city required'});
+  const enriched=await Promise.all(restaurants.slice(0,10).map(async r=>{
+    const name=r.name||r.n||'';
+    return{name,places:name?await getPlaceDetails(name,city,pk):null};
+  }));
+  return res.status(200).json({enriched});
 }
