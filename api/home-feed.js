@@ -1,5 +1,5 @@
 // api/home-feed.js
-const Anthropic = require('@anthropic-ai/sdk');
+import Anthropic from '@anthropic-ai/sdk';
 const cache = new Map();
 const SECTION_PROMPTS = {
   en_fuego:'the 3 most on-fire, buzzing, hottest right now restaurants',
