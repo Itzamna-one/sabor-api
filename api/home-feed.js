@@ -16,7 +16,7 @@ async function getPlaceDetails(name,city,apiKey){
     const p=d.places?.[0];
     if(!p)return null;
     const price={'PRICE_LEVEL_INEXPENSIVE':'$','PRICE_LEVEL_MODERATE':'$$','PRICE_LEVEL_EXPENSIVE':'$$$','PRICE_LEVEL_VERY_EXPENSIVE':'$$$$'};
-    return{photo:p.photos?.[0]?.name?`https://places.googleapis.com/v1/${p.photos[0].name}/media?maxHeightPx=600&maxWidthPx=800&key=${apiKey}`:null,rating:p.rating??null,reviews:p.userRatingCount??null,price:price[p.priceLevel]??null,address:p.formattedAddress??null,isOpen:p.currentOpeningHours?.openNow??null,latitude:p.location?.latitude??null,longitude:p.location?.longitude??null};
+    return{photo:p.photos?.[0]?.name?`https://sabor-api.vercel.app/api/photo?ref=${encodeURIComponent(p.photos[0].name)}`:null,rating:p.rating??null,reviews:p.userRatingCount??null,price:price[p.priceLevel]??null,address:p.formattedAddress??null,isOpen:p.currentOpeningHours?.openNow??null,latitude:p.location?.latitude??null,longitude:p.location?.longitude??null};
   }catch(e){return null;}
 }
 export default async function handler(req,res){
