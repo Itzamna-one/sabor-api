@@ -2,12 +2,18 @@
 import Anthropic from '@anthropic-ai/sdk';
 const cache = new Map();
 const SECTION_PROMPTS = {
-  en_fuego:'the 3 most on-fire, buzzing, hottest right now restaurants',
-  joyas_ocultas:'the 3 best hidden gem / under-the-radar local restaurants',
-  subiendo_fuerte:'the 3 fastest rising, newest trending restaurants',
-  nuevos_spots:'the 3 newest restaurant openings',
-  los_mejores:'the 3 highest-rated, most acclaimed restaurants',
-  tu_barrio:'the 3 best neighborhood, local-favorite restaurants',
+  en_fuego:'the most on-fire, buzzing, hottest right now restaurants',
+  joyas_ocultas:'the best hidden gem / under-the-radar local restaurants',
+  subiendo_fuerte:'the fastest rising, newest trending restaurants',
+  nuevos_spots:'the newest restaurant openings',
+  los_mejores:'the highest-rated, most acclaimed restaurants',
+  tu_barrio:'the best neighborhood, local-favorite restaurants',
+  hot:'the most on-fire, buzzing, hottest right now restaurants',
+  gems:'the best hidden gem / under-the-radar local restaurants',
+  trending:'the fastest rising, newest trending restaurants',
+  new:'the newest restaurant openings',
+  rated:'the highest-rated, most acclaimed restaurants',
+  local:'the best neighborhood, local-favorite restaurants',
 };
 async function getPlaceDetails(name,city,apiKey){
   try{
@@ -24,7 +30,8 @@ export default async function handler(req,res){
   if(req.method==='OPTIONS')return res.status(200).end();
   const city=req.query.city||'Chicago';
   const section=req.query.section||'en_fuego';
-  const key=`${city}:${section}`;
+  const count=parseInt(req.query.count||'3',10);
+  const key=`${city}:${section}:${count}`;
   const hit=cache.get(key);
   if(hit&&Date.now()-hit.ts<300000)return res.status(200).json(hit.data);
   const ak=process.env.ANTHROPIC_API_KEY,pk=process.env.GOOGLE_PLACES_KEY;
@@ -32,7 +39,8 @@ export default async function handler(req,res){
   if(!pk)return res.status(500).json({error:'GOOGLE_PLACES_KEY not set'});
   const desc=SECTION_PROMPTS[section]||SECTION_PROMPTS.en_fuego;
   const anthropic=new Anthropic({apiKey:ak});
-  const msg=await anthropic.messages.create({model:'claude-opus-4-5',max_tokens:400,messages:[{role:'user',content:`You are a local food expert for ${city}. Pick exactly 3 real restaurants that are ${desc} in ${city}. Respond ONLY with valid JSON, no markdown: {"restaurants":[{"name":"Exact Name","cuisine":"Mexican","emoji":"🌮","vibe":"Lively"},{"name":"...","cuisine":"...","emoji":"...","vibe":"..."},{"name":"...","cuisine":"...","emoji":"...","vibe":"..."}]}`}]});
+  const exampleItems=Array.from({length:count},(_,i)=>`{"name":"Restaurant ${i+1}","cuisine":"Cuisine","emoji":"🌮","vibe":"Vibe"}`).join(',');
+  const msg=await anthropic.messages.create({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:`You are a local food expert for ${city}. Pick exactly ${count} real, distinct restaurants that are ${desc} in ${city}. Each must be a different restaurant. Respond ONLY with valid JSON, no markdown: {"restaurants":[${exampleItems}]}`}]});
   const parsed=JSON.parse(msg.content[0].text.replace(/```json|```/g,'').trim());
   const items=await Promise.all(parsed.restaurants.map(async r=>({name:r.name,displayName:r.name,cuisine:r.cuisine,emoji:r.emoji,vibe:r.vibe,places:await getPlaceDetails(r.name,city,pk)})));
   const data={items};
