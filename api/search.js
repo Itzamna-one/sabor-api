@@ -7,15 +7,15 @@ const NEIGHBORHOOD_VIBES = {
   "Pilsen":           "murales, birria auténtica, arte chicano, taquerías familiares",
   "Little Village":   "al pastor, carnitas, La Villita, mercados, antojitos",
   "Humboldt Park":    "comida puertorriqueña, jibarito, pastelillos, La Paseo Boricua",
-  "Logan Square":     "fusión latina trendy, cócteles craft, brunch viral, upscale",
-  "Wicker Park":      "instagrammable, latin fusion, ambiente hipster, brunch",
+  "Logan Square":     "trendy fusion, craft cocktails, viral brunch, upscale dining",
+  "Wicker Park":      "instagrammable spots, hipster vibes, great brunch, eclectic",
   "Back of the Yards":"mexicano old school, sin turistas, precios locales, auténtico",
   "Avondale":         "taquerías escondidas, mezcla polaco-mexicana, joyas ocultas",
   "Pilsen/Bridgeport":"gemas locales, bajo el radar, favoritos del barrio",
-  "Bronzeville":      "soul food latino, mezcla afro-latina, historia y sabor",
+  "Bronzeville":      "soul food, Afro-Latino fusion, rich history, bold flavors",
   "South Chicago":    "mexicano tradicional, mariscos frescos, ambiente familiar",
-  "West Town":        "restaurantes emergentes, chefs latinos jóvenes, trending",
-  "Andersonville":    "fusión internacional, latina moderna, ambiente acogedor",
+  "West Town":        "emerging restaurants, young chefs, trending spots, creative",
+  "Andersonville":    "international fusion, modern cuisine, cozy atmosphere",
 };
 
 // Tier radius config
@@ -94,7 +94,7 @@ export default async function handler(req, res) {
         {
           role: "user",
           content: language === 'en'
-          ? `You are SABOR, a food discovery AI in ${city} that specializes in Latin cuisine but recommends the best restaurants across all cuisines based on the search query.
+          ? `You are SABOR, a food discovery AI in ${city}. Recommend the best restaurants for the search query across ALL cuisines. Only focus on Latin cuisine if the query specifically asks for it.
 
 ${neighborhoodContext}
 ${personalization}
@@ -127,7 +127,7 @@ Critical rules:
 - ${isPremium ? "Can recommend from any neighborhood in Chicago" : `Stay within ${tierConfig.radius} of the user`}
 - Real authentic restaurants in Chicago
 - Never repeat the same 3 spots`
-          : `Eres SABOR, un AI de descubrimiento gastronómico en ${city} especializado en cocina latina pero que recomienda los mejores restaurantes de todas las cocinas según la búsqueda.
+          : `Eres SABOR, un AI de descubrimiento gastronómico en ${city}. Recomienda los mejores restaurantes para la búsqueda en TODAS las cocinas. Solo enfócate en cocina latina si la búsqueda lo pide específicamente.
 
 ${neighborhoodContext}
 ${personalization}
