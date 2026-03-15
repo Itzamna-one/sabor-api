@@ -20,7 +20,7 @@ const NEIGHBORHOOD_VIBES = {
 
 // Tier radius config
 const TIER_CONFIG = {
-  free:    { radius: "1mi",     label: "cerca de ti" },
+  free:    { radius: "1mi",     label: language === 'en' ? 'near you' : 'cerca de ti' },
   credits: { radius: "3mi",     label: "tu zona" },
   premium: { radius: "citywide",label: "todo Chicago" },
 };
