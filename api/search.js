@@ -20,7 +20,7 @@ const NEIGHBORHOOD_VIBES = {
 
 // Tier radius config
 const TIER_CONFIG = {
-  free:    { radius: "1mi",     label: language === 'en' ? 'near you' : 'cerca de ti' },
+  free:    { radius: "1mi",     label: 'cerca de ti' },
   credits: { radius: "3mi",     label: "tu zona" },
   premium: { radius: "citywide",label: "todo Chicago" },
 };
@@ -84,7 +84,7 @@ export default async function handler(req, res) {
     ? `Tags disponibles: 🔥 viral, 💎 gema oculta, ⭐ Para ti (si coincide con perfil), 🏙️ [Barrio] exclusivo`
     : hasCredits
     ? `Tags disponibles: 🔥 viral, 💎 gema oculta, ⭐ Para ti (si coincide con perfil)`
-    : `Tags: 🔥 viral, 📍 cerca de ti`;
+    : `Tags: 🔥 viral, 📍 ${language === 'en' ? 'near you' : 'cerca de ti'}`;
 
   // Smart query classifier
   const latinKeywords = ['latin','latino','latina','mexican','taco','burrito',
