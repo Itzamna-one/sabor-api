@@ -46,6 +46,7 @@ export default async function handler(req, res) {
     favoriteNeighborhoods = [],
     filterNeighborhood = null,
     previousRestaurants = [],
+    language = 'es',
   } = req.body;
 
   if (!query) return res.status(400).json({ error: "Query is required" });
@@ -92,7 +93,41 @@ export default async function handler(req, res) {
       messages: [
         {
           role: "user",
-          content: `Eres SABOR, el AI de descubrimiento de comida latina más auténtico de ${city}.
+          content: language === 'en'
+          ? `You are SABOR, the most authentic Latin food discovery AI in ${city}.
+
+${neighborhoodContext}
+${personalization}
+${rotationNote}
+
+Search: "${query}"
+
+${tagInstruction}
+
+Respond ONLY with valid JSON — no markdown, no backticks:
+{
+  "summary": "1-2 vibrant sentences in English${isPremium ? ", mention the neighborhood" : ""}",
+  "neighborhood": "${currentNeighborhood || "Chicago"}",
+  "results": [
+    {
+      "name": "Name — Exact Neighborhood",
+      "emoji": "food emoji",
+      "description": "2 authentic English sentences about the spot",
+      "tag": "appropriate tag based on tier",
+      "distance": "0.0mi",
+      "neighborhood": "neighborhood name"
+    }
+  ]
+}
+
+Critical rules:
+- Exactly 3 unique results
+- ${rotationNote || "Vary the restaurants"}
+- Respect radius ${tierConfig.radius}
+- ${isPremium ? "Can recommend from any neighborhood in Chicago" : `Stay within ${tierConfig.radius} of the user`}
+- Real authentic restaurants in Chicago
+- Never repeat the same 3 spots`
+          : `Eres SABOR, el AI de descubrimiento de comida latina más auténtico de ${city}.
 
 ${neighborhoodContext}
 ${personalization}
