@@ -86,6 +86,17 @@ export default async function handler(req, res) {
     ? `Tags disponibles: 🔥 viral, 💎 gema oculta, ⭐ Para ti (si coincide con perfil)`
     : `Tags: 🔥 viral, 📍 cerca de ti`;
 
+  // Smart query classifier
+  const latinKeywords = ['latin','latino','latina','mexican','taco','burrito',
+    'colombian','cuban','puerto rican','dominican','salvadoran','peruvian',
+    'argentinian','birria','pozole','tamale','enchilada','cubano','mofongo',
+    'arepa','empanada','ceviche','mexicano','mexicana','colombiana','cubana',
+    'tacos','burritos','pupusa','yuca','plantain','platano'];
+  const isLatinQuery = latinKeywords.some(k => query.toLowerCase().includes(k));
+  const foodContext = isLatinQuery
+    ? (language === 'en' ? 'Latin food specialist' : 'especialista en comida latina')
+    : (language === 'en' ? 'general food discovery expert' : 'experto gastronómico general');
+
   try {
     const message = await client.messages.create({
       model: "claude-sonnet-4-20250514",
@@ -94,7 +105,7 @@ export default async function handler(req, res) {
         {
           role: "user",
           content: language === 'en'
-          ? `You are SABOR, a food discovery AI in ${city}. Recommend the best restaurants for the search query across ALL cuisines. Only focus on Latin cuisine if the query specifically asks for it.
+          ? `You are SABOR, a ${foodContext} in ${city}. ${isLatinQuery ? 'Find the best Latin restaurants for this search.' : 'Find the BEST restaurants for this search across ALL cuisines. Do NOT default to Latin food unless the query asks for it.'}
 
 ${neighborhoodContext}
 ${personalization}
@@ -127,7 +138,7 @@ Critical rules:
 - ${isPremium ? "Can recommend from any neighborhood in Chicago" : `Stay within ${tierConfig.radius} of the user`}
 - Real authentic restaurants in Chicago
 - Never repeat the same 3 spots`
-          : `Eres SABOR, un AI de descubrimiento gastronómico en ${city}. Recomienda los mejores restaurantes para la búsqueda en TODAS las cocinas. Solo enfócate en cocina latina si la búsqueda lo pide específicamente.
+          : `Eres SABOR, un ${foodContext} en ${city}. ${isLatinQuery ? 'Encuentra los mejores restaurantes latinos para esta búsqueda.' : 'Encuentra los MEJORES restaurantes en TODAS las cocinas. NO te limites a comida latina a menos que se pida.'}
 
 ${neighborhoodContext}
 ${personalization}
