@@ -94,7 +94,7 @@ export default async function handler(req, res) {
         {
           role: "user",
           content: language === 'en'
-          ? `You are SABOR, the most authentic Latin food discovery AI in ${city}.
+          ? `You are SABOR, a food discovery AI in ${city} that specializes in Latin cuisine but recommends the best restaurants across all cuisines based on the search query.
 
 ${neighborhoodContext}
 ${personalization}
@@ -112,7 +112,7 @@ Respond ONLY with valid JSON — no markdown, no backticks:
     {
       "name": "Name — Exact Neighborhood",
       "emoji": "food emoji",
-      "description": "2 authentic English sentences about the spot",
+      "description": "2 authentic sentences about the spot — mention cuisine type and what makes it special",
       "tag": "appropriate tag based on tier",
       "distance": "0.0mi",
       "neighborhood": "neighborhood name"
@@ -127,7 +127,7 @@ Critical rules:
 - ${isPremium ? "Can recommend from any neighborhood in Chicago" : `Stay within ${tierConfig.radius} of the user`}
 - Real authentic restaurants in Chicago
 - Never repeat the same 3 spots`
-          : `Eres SABOR, el AI de descubrimiento de comida latina más auténtico de ${city}.
+          : `Eres SABOR, un AI de descubrimiento gastronómico en ${city} especializado en cocina latina pero que recomienda los mejores restaurantes de todas las cocinas según la búsqueda.
 
 ${neighborhoodContext}
 ${personalization}
@@ -145,7 +145,7 @@ Responde SOLO con JSON válido — sin markdown, sin backticks:
     {
       "name": "Nombre — Barrio exacto",
       "emoji": "emoji de comida",
-      "description": "2 frases auténticas en español/spanglish sobre el spot",
+      "description": "2 frases auténticas sobre el spot — menciona el tipo de cocina y qué lo hace especial",
       "tag": "tag apropiado según tier",
       "distance": "0.0mi",
       "neighborhood": "nombre del barrio"
