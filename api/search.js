@@ -109,18 +109,7 @@ export default async function handler(req, res) {
         {
           role: "user",
           content: language === 'en'
-          ? `You are SABOR, a ${foodContext} in ${city}. ${query.toLowerCase().includes('plan my full food day') ? `
-You are a personal food concierge. Create a detailed day itinerary with REAL restaurants.
-Budget: Extract the dollar amount from the query.
-Format each restaurant as:
-- Time of day (Morning/Lunch/Snack/Dinner)
-- Restaurant name and neighborhood  
-- Specific dish recommendations with approximate prices
-- Running total toward the budget
-Make it feel like a friend who knows the city is planning your day.
-The summary should read like: "Start your morning at X with blueberry pancakes and coffee (~$15), then head to Y in Z neighborhood for lunch..." 
-Include actual dish names, not generic descriptions.
-Keep total under the stated budget.` : isStreetFood ? 'Find street vendors, food carts, taco trucks, and informal street food sellers — NOT brick and mortar restaurants. Include their typical locations and neighborhoods.' : isLatinQuery ? 'Find the best Latin restaurants for this search.' : 'Find the BEST restaurants for this search across ALL cuisines. Do NOT default to Latin food unless asked.'}`
+          ? `You are SABOR, a ${foodContext} in ${city}. ${query.toLowerCase().includes('plan my full food day') ? 'You are a personal food concierge. Create a detailed day itinerary with morning coffee or breakfast, lunch, afternoon snack, and dinner. Include real restaurant names, neighborhoods, dish recommendations with prices, and running total toward the budget. Keep total under the stated budget.' : isStreetFood ? 'Find street vendors, food carts, taco trucks, and informal street food sellers — NOT brick and mortar restaurants. Include their typical locations and neighborhoods.' : isLatinQuery ? 'Find the best Latin restaurants for this search.' : 'Find the BEST restaurants for this search across ALL cuisines. Do NOT default to Latin food unless asked.'}
 
 ${neighborhoodContext}
 ${personalization}
