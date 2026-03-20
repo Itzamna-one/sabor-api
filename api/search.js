@@ -51,6 +51,16 @@ export default async function handler(req, res) {
 
   if (!query) return res.status(400).json({ error: "Query is required" });
 
+  // Random seed to force variety in results
+  const rotationSeeds = [
+    'Focus on lesser-known spots that locals love but tourists miss.',
+    'Prioritize spots that have been trending in the last 30 days.',
+    'Focus on hidden gems with under 500 reviews but exceptional quality.',
+    'Highlight spots from underrepresented neighborhoods.',
+    'Focus on spots with the most unique or signature dishes.',
+  ];
+  const seed = rotationSeeds[Math.floor(Math.random() * rotationSeeds.length)];
+
   const tierConfig = TIER_CONFIG[tier] || TIER_CONFIG.free;
   const isPremium = tier === "premium";
   const hasCredits = tier === "credits";
@@ -116,6 +126,8 @@ ${personalization}
 ${rotationNote}
 
 Search: "${query}"
+
+${seed}
 
 ${tagInstruction}
 
