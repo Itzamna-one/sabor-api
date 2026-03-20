@@ -92,6 +92,10 @@ export default async function handler(req, res) {
     'argentinian','birria','pozole','tamale','enchilada','cubano','mofongo',
     'arepa','empanada','ceviche','mexicano','mexicana','colombiana','cubana',
     'tacos','burritos','pupusa','yuca','plantain','platano'];
+  const streetFoodKeywords = ['taco truck','elote','elotero','tamalera','tamale vendor',
+    'paletero','paleta','fruit cart','frutero','puesto','street taco','antojitos',
+    'troca','esquite','street vendor','street food','street corn'];
+  const isStreetFood = streetFoodKeywords.some(k => query.toLowerCase().includes(k));
   const isLatinQuery = latinKeywords.some(k => query.toLowerCase().includes(k));
   const foodContext = isLatinQuery
     ? (language === 'en' ? 'Latin food specialist' : 'especialista en comida latina')
@@ -105,7 +109,18 @@ export default async function handler(req, res) {
         {
           role: "user",
           content: language === 'en'
-          ? `You are SABOR, a ${foodContext} in ${city}. ${isLatinQuery ? 'Find the best Latin restaurants for this search.' : 'Find the BEST restaurants for this search across ALL cuisines. Do NOT default to Latin food unless the query asks for it.'}
+          ? `You are SABOR, a ${foodContext} in ${city}. ${query.toLowerCase().includes('plan my full food day') ? `
+You are a personal food concierge. Create a detailed day itinerary with REAL restaurants.
+Budget: Extract the dollar amount from the query.
+Format each restaurant as:
+- Time of day (Morning/Lunch/Snack/Dinner)
+- Restaurant name and neighborhood  
+- Specific dish recommendations with approximate prices
+- Running total toward the budget
+Make it feel like a friend who knows the city is planning your day.
+The summary should read like: "Start your morning at X with blueberry pancakes and coffee (~$15), then head to Y in Z neighborhood for lunch..." 
+Include actual dish names, not generic descriptions.
+Keep total under the stated budget.` : isStreetFood ? 'Find street vendors, food carts, taco trucks, and informal street food sellers — NOT brick and mortar restaurants. Include their typical locations and neighborhoods.' : isLatinQuery ? 'Find the best Latin restaurants for this search.' : 'Find the BEST restaurants for this search across ALL cuisines. Do NOT default to Latin food unless asked.'}`
 
 ${neighborhoodContext}
 ${personalization}
@@ -138,7 +153,7 @@ Critical rules:
 - ${isPremium ? "Can recommend from any neighborhood in Chicago" : `Stay within ${tierConfig.radius} of the user`}
 - Real authentic restaurants in Chicago
 - Never repeat the same 3 spots`
-          : `Eres SABOR, un ${foodContext} en ${city}. ${isLatinQuery ? 'Encuentra los mejores restaurantes latinos para esta búsqueda.' : 'Encuentra los MEJORES restaurantes en TODAS las cocinas. NO te limites a comida latina a menos que se pida.'}
+          : `Eres SABOR, un ${foodContext} en ${city}. ${isStreetFood ? 'Encuentra vendedores ambulantes, carritos de comida, trocas de tacos y vendedores informales — NO restaurantes establecidos. Incluye sus ubicaciones típicas y barrios.' : isLatinQuery ? 'Encuentra los mejores restaurantes latinos para esta búsqueda.' : 'Encuentra los MEJORES restaurantes en TODAS las cocinas. NO te limites a comida latina a menos que se pida.'}
 
 ${neighborhoodContext}
 ${personalization}
