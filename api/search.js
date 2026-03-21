@@ -48,6 +48,71 @@ function setCache(key, data) {
   searchCache.set(key, { data, timestamp: Date.now() });
 }
 
+
+// Chicago ZIP → Neighborhood lookup table
+const CHICAGO_NEIGHBORHOODS = {
+  // Chicago proper
+  '60601': 'The Loop', '60602': 'The Loop', '60603': 'The Loop',
+  '60604': 'The Loop', '60605': 'South Loop', '60606': 'The Loop',
+  '60607': 'West Loop', '60608': 'Pilsen', '60609': 'Back of the Yards',
+  '60610': 'Near North Side', '60611': 'Streeterville', '60612': 'East Garfield Park',
+  '60613': 'Lakeview', '60614': 'Lincoln Park', '60615': 'Woodlawn',
+  '60616': 'Chinatown', '60617': 'South Chicago', '60618': 'Avondale',
+  '60619': 'Chatham', '60620': 'Auburn Gresham', '60621': 'Englewood',
+  '60622': 'Wicker Park', '60623': 'Little Village', '60624': 'Humboldt Park',
+  '60625': 'Albany Park', '60626': 'Rogers Park', '60628': 'Roseland',
+  '60629': 'Gage Park', '60630': 'Jefferson Park', '60631': 'Norwood Park',
+  '60632': 'Back of the Yards', '60633': 'Hegewisch', '60634': 'Dunning',
+  '60636': 'West Englewood', '60637': 'Hyde Park', '60638': 'Garfield Ridge',
+  '60639': 'Belmont Cragin', '60640': 'Uptown', '60641': 'Hermosa',
+  '60642': 'Noble Square', '60643': 'Beverly', '60644': 'Austin',
+  '60645': 'West Ridge', '60646': 'Norwood Park', '60647': 'Logan Square',
+  '60649': 'South Shore', '60651': 'Humboldt Park', '60652': 'Ashburn',
+  '60653': 'Bronzeville', '60654': 'River North', '60655': 'Morgan Park',
+  '60656': 'Norwood Park', '60657': 'Lakeview', '60659': 'West Ridge',
+  '60660': 'Edgewater', '60661': 'West Loop', '60707': 'Elmwood Park',
+  // Suburbs - show city name
+  '60402': 'Berwyn', '60304': 'Oak Park', '60301': 'Oak Park',
+  '60302': 'Oak Park', '60303': 'Oak Park', '60305': 'River Forest',
+  '60130': 'Forest Park', '60153': 'Maywood', '60154': 'Westchester',
+  '60155': 'Broadview', '60160': 'Melrose Park', '60163': 'Berkeley',
+  '60164': 'Melrose Park', '60165': 'Stone Park', '60171': 'River Grove',
+  '60176': 'Schiller Park', '60406': 'Blue Island', '60409': 'Calumet City',
+  '60411': 'Chicago Heights', '60415': 'Chicago Ridge', '60419': 'Dolton',
+  '60422': 'Flossmoor', '60425': 'Glenwood', '60426': 'Harvey',
+  '60429': 'Hazel Crest', '60430': 'Homewood', '60438': 'Lansing',
+  '60443': 'Matteson', '60445': 'Midlothian', '60452': 'Oak Forest',
+  '60453': 'Oak Lawn', '60455': 'Bridgeview', '60456': 'Hometown',
+  '60457': 'Hickory Hills', '60458': 'Justice', '60459': 'Burbank',
+  '60461': 'Olympia Fields', '60462': 'Orland Park', '60463': 'Palos Heights',
+  '60464': 'Palos Park', '60465': 'Palos Hills', '60466': 'Park Forest',
+  '60469': 'Posen', '60471': 'Richton Park', '60472': 'Robbins',
+  '60473': 'South Holland', '60475': 'Steger', '60476': 'Thornton',
+  '60477': 'Tinley Park', '60478': 'Country Club Hills', '60480': 'Willow Springs',
+  '60482': 'Worth', '60501': 'Summit', '60513': 'Brookfield',
+  '60525': 'La Grange', '60526': 'La Grange Park', '60534': 'Lyons',
+  '60546': 'Riverside', '60558': 'Western Springs', '60804': 'Cicero',
+  '60827': 'Burnham',
+};
+
+function getNeighborhood(address) {
+  if (!address) return null;
+  // Extract ZIP code from address
+  const zipMatch = address.match(/\b(\d{5})\b/);
+  if (zipMatch) {
+    const zip = zipMatch[1];
+    if (CHICAGO_NEIGHBORHOODS[zip]) return CHICAGO_NEIGHBORHOODS[zip];
+  }
+  // Check for known suburb names in address
+  const suburbs = ['Cicero', 'Berwyn', 'Oak Lawn', 'Oak Park', 'Evanston', 
+    'Skokie', 'Niles', 'Norridge', 'Harwood Heights', 'Elmwood Park',
+    'River Forest', 'Forest Park', 'Maywood', 'Bellwood', 'Melrose Park'];
+  for (const suburb of suburbs) {
+    if (address.includes(suburb)) return suburb;
+  }
+  return null;
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -233,6 +298,16 @@ Reglas críticas:
     const clean = raw.replace(/^```json\n?|^```\n?|\n?```$/g, "").trim();
     const parsed = JSON.parse(clean);
     setCache(cacheKey, parsed);
+    // Enhance neighborhood data using lookup table
+    if (parsed.results) {
+      parsed.results = parsed.results.map(r => {
+        if (r.address) {
+          const verifiedHood = getNeighborhood(r.address);
+          if (verifiedHood) r.neighborhood = verifiedHood;
+        }
+        return r;
+      });
+    }
     return res.status(200).json(parsed);
   } catch (err) {
     console.error("SABOR API error:", err);
