@@ -25,6 +25,29 @@ const TIER_CONFIG = {
   premium: { radius: "citywide",label: "todo Chicago" },
 };
 
+// Simple in-memory cache
+const searchCache = new Map();
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+function getCacheKey(query, city, tier, language) {
+  const normalized = query.toLowerCase()
+    .replace(/\b(the|a|an|best|top|find|near|me|in|at)\b/g, '')
+    .replace(/\s+/g, ' ').trim();
+  return `${normalized}|${city.split(',')[0].toLowerCase()}|${tier}|${language}`;
+}
+
+function getCached(key) {
+  const entry = searchCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL) { searchCache.delete(key); return null; }
+  return entry.data;
+}
+
+function setCache(key, data) {
+  if (searchCache.size >= 500) searchCache.delete(searchCache.keys().next().value);
+  searchCache.set(key, { data, timestamp: Date.now() });
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
