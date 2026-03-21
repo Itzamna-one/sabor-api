@@ -183,7 +183,7 @@ Respond ONLY with valid JSON — no markdown, no backticks:
 }
 
 Critical rules:
-- Exactly 3 unique results
+- Exactly ${tier === 'premium' ? '6' : '3'} unique results
 - ${rotationNote || "Vary the restaurants"}
 - Respect radius ${tierConfig.radius}
 - ${isPremium ? "Can recommend from any neighborhood in Chicago" : `Stay within ${tierConfig.radius} of the user`}
