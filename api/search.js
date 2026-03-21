@@ -51,6 +51,19 @@ export default async function handler(req, res) {
 
   if (!query) return res.status(400).json({ error: "Query is required" });
 
+  // Fetch trending terms to boost relevant results
+  let trendingContext = '';
+  try {
+    const trendsResp = await fetch(`${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://sabor-api.vercel.app'}/api/trends?city=${encodeURIComponent(city.split(',')[0])}`);
+    if (trendsResp.ok) {
+      const trendsData = await trendsResp.json();
+      const topTerms = trendsData.trending_now?.slice(0, 3).map(t => t.term).join(', ');
+      if (topTerms) trendingContext = `\nCurrently trending in ${city.split(',')[0]}: ${topTerms}. Prioritize spots related to these trends when relevant.`;
+    }
+  } catch (e) {
+    // Silently fail - trends are supplementary
+  }
+
   // Random seed to force variety in results
   const rotationSeeds = [
     'Focus on lesser-known spots that locals love but tourists miss.',
@@ -111,6 +124,14 @@ export default async function handler(req, res) {
     ? (language === 'en' ? 'Latin food specialist' : 'especialista en comida latina')
     : (language === 'en' ? 'general food discovery expert' : 'experto gastronómico general');
 
+  // Check cache first
+  const cacheKey = getCacheKey(query, city, tier, language);
+  const cached = getCached(cacheKey);
+  if (cached) {
+    console.log('Cache hit:', cacheKey);
+    return res.status(200).json(cached);
+  }
+
   try {
     const message = await client.messages.create({
       model: "claude-sonnet-4-20250514",
@@ -127,7 +148,7 @@ ${rotationNote}
 
 Search: "${query}"
 
-${seed}
+${seed}${trendingContext}
 
 ${tagInstruction}
 
@@ -194,6 +215,7 @@ Reglas críticas:
     const raw = message.content[0].text.trim();
     const clean = raw.replace(/^```json\n?|^```\n?|\n?```$/g, "").trim();
     const parsed = JSON.parse(clean);
+    setCache(cacheKey, parsed);
     return res.status(200).json(parsed);
   } catch (err) {
     console.error("SABOR API error:", err);
