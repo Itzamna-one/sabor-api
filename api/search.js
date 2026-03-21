@@ -53,16 +53,7 @@ export default async function handler(req, res) {
 
   // Fetch trending terms to boost relevant results
   let trendingContext = '';
-  try {
-    const trendsResp = await fetch(`${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://sabor-api.vercel.app'}/api/trends?city=${encodeURIComponent(city.split(',')[0])}`);
-    if (trendsResp.ok) {
-      const trendsData = await trendsResp.json();
-      const topTerms = trendsData.trending_now?.slice(0, 3).map(t => t.term).join(', ');
-      if (topTerms) trendingContext = `\nCurrently trending in ${city.split(',')[0]}: ${topTerms}. Prioritize spots related to these trends when relevant.`;
-    }
-  } catch (e) {
-    // Silently fail - trends are supplementary
-  }
+  // Trends are supplementary - skip to avoid adding latency
 
   // Random seed to force variety in results
   const rotationSeeds = [
