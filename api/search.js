@@ -29,11 +29,12 @@ const TIER_CONFIG = {
 const searchCache = new Map();
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
-function getCacheKey(query, city, tier, language) {
+function getCacheKey(query, city, tier, language, filterNeighborhood) {
   const normalized = query.toLowerCase()
     .replace(/\b(the|a|an|best|top|find|near|me|in|at)\b/g, '')
     .replace(/\s+/g, ' ').trim();
-  return `${normalized}|${city.split(',')[0].toLowerCase()}|${tier}|${language}`;
+  const hood = filterNeighborhood ? filterNeighborhood.toLowerCase() : 'all';
+  return `${normalized}|${city.split(',')[0].toLowerCase()}|${tier}|${language}|${hood}`;
 }
 
 function getCached(key) {
@@ -204,7 +205,7 @@ export default async function handler(req, res) {
     : (language === 'en' ? 'general food discovery expert' : 'experto gastronómico general');
 
   // Check cache first (skip cache for street food - always fresh)
-  const cacheKey = getCacheKey(query, city, tier, language);
+  const cacheKey = getCacheKey(query, city, tier, language, filterNeighborhood);
   const skipCache = isStreetFood || query.toLowerCase().includes('vendor') || query.toLowerCase().includes('truck');
   if (!skipCache) {
     const cached = getCached(cacheKey);
