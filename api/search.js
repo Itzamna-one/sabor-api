@@ -138,12 +138,15 @@ export default async function handler(req, res) {
     ? (language === 'en' ? 'Latin food specialist' : 'especialista en comida latina')
     : (language === 'en' ? 'general food discovery expert' : 'experto gastronómico general');
 
-  // Check cache first
+  // Check cache first (skip cache for street food - always fresh)
   const cacheKey = getCacheKey(query, city, tier, language);
-  const cached = getCached(cacheKey);
-  if (cached) {
-    console.log('Cache hit:', cacheKey);
-    return res.status(200).json(cached);
+  const skipCache = isStreetFood || query.toLowerCase().includes('vendor') || query.toLowerCase().includes('truck');
+  if (!skipCache) {
+    const cached = getCached(cacheKey);
+    if (cached) {
+      console.log('Cache hit:', cacheKey);
+      return res.status(200).json(cached);
+    }
   }
 
   try {
