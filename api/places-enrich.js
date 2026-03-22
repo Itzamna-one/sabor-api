@@ -2,12 +2,33 @@
 async function getPlaceDetails(name,city,apiKey){
   try{
     // Step 1: Search for the place
-    const r=await fetch('https://places.googleapis.com/v1/places:searchText',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':apiKey,'X-Goog-FieldMask':'places.rating,places.userRatingCount,places.priceLevel,places.formattedAddress,places.addressComponents,places.currentOpeningHours,places.location,places.photos'},body:JSON.stringify({textQuery:`${name} restaurant ${city}`,maxResultCount:1})});
+    const r=await fetch('https://places.googleapis.com/v1/places:searchText',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':apiKey,'X-Goog-FieldMask':'places.rating,places.userRatingCount,places.priceLevel,places.formattedAddress,places.addressComponents,places.currentOpeningHours,places.location,places.photos'},body:JSON.stringify({
+          textQuery:`${name} restaurant ${city}`,
+          maxResultCount:1,
+          locationBias:{
+            circle:{
+              center:{latitude:41.8781,longitude:-87.6298},
+              radius:50000.0
+            }
+          }
+        })});
     const d=await r.json();
     const p=d.places?.[0];
     if(!p)return null;
     const price={'PRICE_LEVEL_INEXPENSIVE':'$','PRICE_LEVEL_MODERATE':'$$','PRICE_LEVEL_EXPENSIVE':'$$$','PRICE_LEVEL_VERY_EXPENSIVE':'$$$$'};
     
+    // Step 2: Validate result is actually in Chicago metro (reject NYC etc)
+    const lat = p.location?.latitude;
+    const lng = p.location?.longitude;
+    if (lat && lng) {
+      // Chicago bounding box: roughly 41.6-42.1 lat, -88.0 to -87.5 lng
+      const inChicago = lat >= 41.6 && lat <= 42.1 && lng >= -88.0 && lng <= -87.5;
+      if (!inChicago) {
+        console.log(`Rejected out-of-area result: ${name} at ${lat},${lng}`);
+        return null;
+      }
+    }
+
     // Step 2: Extract neighborhood from addressComponents
     let neighborhood = null;
     if (p.addressComponents) {
