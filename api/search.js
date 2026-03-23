@@ -206,7 +206,7 @@ export default async function handler(req, res) {
 
   // Check cache first (skip cache for street food - always fresh)
   const cacheKey = getCacheKey(query, city, tier, language, filterNeighborhood);
-  const skipCache = isStreetFood || query.toLowerCase().includes('vendor') || query.toLowerCase().includes('truck');
+  const skipCache = isStreetFood || query.toLowerCase().includes('vendor') || query.toLowerCase().includes('truck') || query.toLowerCase().includes('similar to');
   if (!skipCache) {
     const cached = getCached(cacheKey);
     if (cached) {
