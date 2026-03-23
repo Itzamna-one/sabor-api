@@ -1,5 +1,17 @@
 const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args));
 
+// Dynamic dates - always upcoming
+function getUpcomingDay(targetDay, weeksAhead = 0) {
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const today = new Date();
+  let daysUntil = (targetDay - today.getDay() + 7) % 7;
+  if (daysUntil === 0) daysUntil = 7; // next occurrence
+  const d = new Date(today);
+  d.setDate(today.getDate() + daysUntil + (weeksAhead * 7));
+  return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+}
+
 const SAMPLE_EVENTS = [
   {
     id: 'evt_001',
@@ -8,7 +20,7 @@ const SAMPLE_EVENTS = [
     venue: 'La Palapa Chicago',
     neighborhood: 'Pilsen',
     city: 'Chicago, IL',
-    date: 'Sunday, March 23',
+    date: getUpcomingDay(0),
     time: '11:00 AM - 3:00 PM',
     price: '$35',
     priceNum: 35,
@@ -27,7 +39,7 @@ const SAMPLE_EVENTS = [
     venue: 'Cantina Diablo',
     neighborhood: 'Logan Square',
     city: 'Chicago, IL',
-    date: 'Friday, March 21',
+    date: getUpcomingDay(5),
     time: '7:00 PM - 10:00 PM',
     price: '$65',
     priceNum: 65,
@@ -46,7 +58,7 @@ const SAMPLE_EVENTS = [
     venue: 'Humboldt Park',
     neighborhood: 'Humboldt Park',
     city: 'Chicago, IL',
-    date: 'Saturday, March 22',
+    date: getUpcomingDay(6),
     time: '12:00 PM - 8:00 PM',
     price: 'Free',
     priceNum: 0,
@@ -65,7 +77,7 @@ const SAMPLE_EVENTS = [
     venue: 'Secret Location — Revealed 24hrs Before',
     neighborhood: 'Little Village',
     city: 'Chicago, IL',
-    date: 'Saturday, March 29',
+    date: getUpcomingDay(6, 1),
     time: '7:30 PM - 11:00 PM',
     price: '$85',
     priceNum: 85,
@@ -84,7 +96,7 @@ const SAMPLE_EVENTS = [
     venue: 'Café Corazón',
     neighborhood: 'Wicker Park',
     city: 'Chicago, IL',
-    date: 'Sunday, March 23',
+    date: getUpcomingDay(0),
     time: '8:00 AM - 11:00 AM',
     price: '$15',
     priceNum: 15,
@@ -103,7 +115,7 @@ const SAMPLE_EVENTS = [
     venue: 'Multiple Locations',
     neighborhood: 'Pilsen → Little Village → La Villita → Back of the Yards',
     city: 'Chicago, IL',
-    date: 'Thursday, March 20',
+    date: getUpcomingDay(4),
     time: '4:00 PM - 8:00 PM',
     price: '$20 suggested',
     priceNum: 20,
