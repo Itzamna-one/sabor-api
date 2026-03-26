@@ -179,8 +179,10 @@ export default async function handler(req, res) {
 
   // Personalization
   const personalization = hasProfile
-    ? `Perfil: ${profileContext}. Dieta: ${diets.join(", ") || "sin restricciones"}. Ambiente: ${vibes.join(", ") || "cualquiera"}.`
-    : "Usuario nuevo — sugiere variedad representativa.";
+    ? (language === 'en'
+      ? `User profile: ${profileContext}. Dietary needs: ${diets.join(", ") || "no restrictions"}. Preferred cuisines: ${cuisines.join(", ") || "open to all"}. Vibe: ${vibes.join(", ") || "any"}.${isPlanQuery ? ' IMPORTANT: All dish recommendations MUST respect these dietary preferences. Do not suggest dishes that conflict with the user\'s diet.' : ''}`
+      : `Perfil: ${profileContext}. Dieta: ${diets.join(", ") || "sin restricciones"}. Cocinas preferidas: ${cuisines.join(", ") || "abierto a todo"}. Ambiente: ${vibes.join(", ") || "cualquiera"}.${isPlanQuery ? ' IMPORTANTE: Todas las recomendaciones de platillos DEBEN respetar estas preferencias dietéticas. No sugieras platillos que contradigan la dieta del usuario.' : ''}`)
+    : (language === 'en' ? "New user — suggest representative variety." : "Usuario nuevo — sugiere variedad representativa.");
 
   // Tag logic
   const tagInstruction = isPremium
@@ -230,7 +232,7 @@ export default async function handler(req, res) {
         {
           role: "user",
           content: language === 'en'
-          ? `You are SABOR, a ${foodContext} in ${city}. ${isPlanQuery ? 'You are a personal food concierge. Create a full-day food itinerary: morning coffee/breakfast, lunch, afternoon snack, and dinner. For EACH stop, recommend specific menu items with dollar prices (e.g. "Cortado $4.50, Tres Leches Pancakes $12"). Show a running total after each stop like "Running total: $16.50". The grand total MUST stay under the stated budget. Use real restaurant names and neighborhoods in Chicago.' : isStreetFood ? `Find street vendors, food carts, and informal street food sellers ONLY for this specific search: "${query}". Results must match the exact type of street food being searched. NO restaurants, NO bakeries unless specifically searched. Include typical locations, neighborhoods, and days/hours they operate.` : isLatinQuery ? 'Find the best Latin restaurants for this search.' : 'Find the BEST restaurants for this search across ALL cuisines. Do NOT default to Latin food unless asked.'}
+          ? `You are SABOR, a ${foodContext} in ${city}. ${isPlanQuery ? 'You are a personal food concierge. Create a full-day food itinerary: morning coffee/breakfast, lunch, afternoon snack, and dinner. For EACH stop, recommend specific menu items with dollar prices for EACH person (e.g. "Cortado $4.50, Tres Leches Pancakes $12"). If this is for multiple people, list items per person and show the combined cost. Show a running total after each stop like "Running total: $16.50 (2 people)". The grand total MUST stay under the stated budget. Use real restaurant names and neighborhoods in Chicago. Include the neighborhood in each result\'s "neighborhood" field.' : isStreetFood ? `Find street vendors, food carts, and informal street food sellers ONLY for this specific search: "${query}". Results must match the exact type of street food being searched. NO restaurants, NO bakeries unless specifically searched. Include typical locations, neighborhoods, and days/hours they operate.` : isLatinQuery ? 'Find the best Latin restaurants for this search.' : 'Find the BEST restaurants for this search across ALL cuisines. Do NOT default to Latin food unless asked.'}
 
 ${neighborhoodContext}
 ${personalization}
@@ -265,7 +267,7 @@ Critical rules:
 - ${isPremium ? "Can recommend from any neighborhood in Chicago" : `Stay within ${tierConfig.radius} of the user`}
 - Real authentic restaurants in Chicago
 - Never repeat the same 3 spots`
-          : `Eres SABOR, un ${foodContext} en ${city}. ${isPlanQuery ? 'Eres un concierge personal de comida. Crea un itinerario completo del día: café/desayuno, almuerzo, snack y cena. Para CADA parada, recomienda platillos específicos del menú con precios en dólares (ej: "Cortado $4.50, Pancakes de Tres Leches $12"). Muestra un total acumulado después de cada parada como "Total acumulado: $16.50". El total final DEBE quedar bajo el presupuesto indicado. Usa nombres reales de restaurantes y barrios de Chicago.' : isStreetFood ? 'Encuentra vendedores ambulantes, carritos de comida, trocas de tacos y vendedores informales — NO restaurantes establecidos. Incluye sus ubicaciones típicas y barrios.' : isLatinQuery ? 'Encuentra los mejores restaurantes latinos para esta búsqueda.' : 'Encuentra los MEJORES restaurantes en TODAS las cocinas. NO te limites a comida latina a menos que se pida.'}
+          : `Eres SABOR, un ${foodContext} en ${city}. ${isPlanQuery ? 'Eres un concierge personal de comida. Crea un itinerario completo del día: café/desayuno, almuerzo, snack y cena. Para CADA parada, recomienda platillos específicos del menú con precios en dólares por CADA persona (ej: "Cortado $4.50, Pancakes de Tres Leches $12"). Si es para varias personas, lista los items por persona y muestra el costo combinado. Muestra un total acumulado después de cada parada como "Total acumulado: $16.50 (2 personas)". El total final DEBE quedar bajo el presupuesto indicado. Usa nombres reales de restaurantes y barrios de Chicago. Incluye el barrio en el campo "neighborhood" de cada resultado.' : isStreetFood ? 'Encuentra vendedores ambulantes, carritos de comida, trocas de tacos y vendedores informales — NO restaurantes establecidos. Incluye sus ubicaciones típicas y barrios.' : isLatinQuery ? 'Encuentra los mejores restaurantes latinos para esta búsqueda.' : 'Encuentra los MEJORES restaurantes en TODAS las cocinas. NO te limites a comida latina a menos que se pida.'}
 
 ${neighborhoodContext}
 ${personalization}
