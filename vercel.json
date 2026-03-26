@@ -2,7 +2,7 @@
   "version": 2,
   "functions": {
     "api/search.js": {
-      "maxDuration": 45
+      "maxDuration": 60
     },
     "api/home-feed.js": {
       "maxDuration": 30
