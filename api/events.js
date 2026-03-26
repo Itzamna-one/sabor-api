@@ -1,16 +1,20 @@
 // api/events.js — Dynamic events with upcoming dates
 
-// Dynamic dates helper
+// Dynamic dates helper — includes today if the day matches
 function getUpcomingDay(targetDay, weeksAhead = 0) {
   const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const today = new Date();
   let daysUntil = (targetDay - today.getDay() + 7) % 7;
-  if (daysUntil === 0) daysUntil = 7;
+  // daysUntil === 0 means today IS the target day — show it today, not next week
   const d = new Date(today);
   d.setDate(today.getDate() + daysUntil + (weeksAhead * 7));
-  return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+  const isToday = daysUntil === 0 && weeksAhead === 0;
+  return isToday ? `Today, ${months[d.getMonth()]} ${d.getDate()}` : `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
 }
+
+// Helper: get today's day number (0=Sun, 1=Mon, ... 6=Sat)
+function todayNum() { return new Date().getDay(); }
 
 // Curated SABOR events - diverse food scene
 const SABOR_EVENTS = [
@@ -184,7 +188,7 @@ const SABOR_EVENTS = [
     venue: 'Vanille Patisserie',
     neighborhood: 'Lincoln Park',
     city: 'Chicago, IL',
-    date: getUpcomingDay(6),
+    date: getUpcomingDay(2),
     time: '9:00 AM - 1:00 PM',
     price: '$10+',
     priceNum: 10,
@@ -245,7 +249,7 @@ const SABOR_EVENTS = [
     venue: 'Demera Ethiopian',
     neighborhood: 'Uptown',
     city: 'Chicago, IL',
-    date: getUpcomingDay(5),
+    date: getUpcomingDay(2),
     time: '6:30 PM - 10:00 PM',
     price: '$30',
     priceNum: 30,
@@ -305,7 +309,7 @@ const SABOR_EVENTS = [
     venue: 'San Soo Gab San',
     neighborhood: 'Lincoln Square',
     city: 'Chicago, IL',
-    date: getUpcomingDay(5),
+    date: getUpcomingDay(3),
     time: '7:00 PM - 12:00 AM',
     price: '$35',
     priceNum: 35,
@@ -366,7 +370,7 @@ const SABOR_EVENTS = [
     venue: 'Parlor Pizza Bar',
     neighborhood: 'West Loop',
     city: 'Chicago, IL',
-    date: getUpcomingDay(6),
+    date: getUpcomingDay(2),
     time: '1:00 PM - 6:00 PM',
     price: 'Free entry',
     priceNum: 0,
@@ -427,7 +431,7 @@ const SABOR_EVENTS = [
     venue: 'La Villita Cultural Center',
     neighborhood: 'Little Village',
     city: 'Chicago, IL',
-    date: getUpcomingDay(6),
+    date: getUpcomingDay(1),
     time: '6:00 PM - 11:00 PM',
     price: '$25',
     priceNum: 25,
@@ -448,7 +452,7 @@ const SABOR_EVENTS = [
     venue: 'Pilsen Community Garden',
     neighborhood: 'Pilsen',
     city: 'Chicago, IL',
-    date: getUpcomingDay(6),
+    date: getUpcomingDay(1),
     time: '2:00 PM - 7:00 PM',
     price: 'Free entry',
     priceNum: 0,
@@ -468,7 +472,7 @@ const SABOR_EVENTS = [
     venue: 'Osmium Coffee Bar',
     neighborhood: 'Pilsen',
     city: 'Chicago, IL',
-    date: getUpcomingDay(6),
+    date: getUpcomingDay(1),
     time: '2:00 PM - 5:00 PM',
     price: '$12',
     priceNum: 12,
@@ -488,7 +492,7 @@ const SABOR_EVENTS = [
     venue: 'Bonus Round Game Café',
     neighborhood: 'Logan Square',
     city: 'Chicago, IL',
-    date: getUpcomingDay(6),
+    date: getUpcomingDay(2),
     time: '1:00 PM - 6:00 PM',
     price: '$10',
     priceNum: 10,
@@ -588,10 +592,14 @@ export default async function handler(req, res) {
     }
   }
 
-  // Sort by date (soonest first)
+  // Prioritize: today's events first, then soonest upcoming
+  const todayStr = 'Today,';
   events.sort((a, b) => {
-    const dateA = new Date(a.date);
-    const dateB = new Date(b.date);
+    const aToday = a.date.startsWith(todayStr) ? 0 : 1;
+    const bToday = b.date.startsWith(todayStr) ? 0 : 1;
+    if (aToday !== bToday) return aToday - bToday;
+    const dateA = new Date(a.date.replace('Today,', new Date().toDateString()));
+    const dateB = new Date(b.date.replace('Today,', new Date().toDateString()));
     return dateA - dateB;
   });
 
