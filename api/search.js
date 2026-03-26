@@ -226,8 +226,8 @@ export default async function handler(req, res) {
 
   try {
     const message = await client.messages.create({
-      model: isPlanQuery ? "claude-sonnet-4-20250514" : (tier === "premium" ? "claude-sonnet-4-20250514" : "claude-haiku-4-5-20251001"),
-      max_tokens: isPlanQuery ? 1100 : (tier === 'premium' ? 900 : 500),
+      model: isPlanQuery ? "claude-haiku-4-5-20251001" : (tier === "premium" ? "claude-sonnet-4-20250514" : "claude-haiku-4-5-20251001"),
+      max_tokens: isPlanQuery ? 900 : (tier === 'premium' ? 900 : 500),
       messages: [
         {
           role: "user",
