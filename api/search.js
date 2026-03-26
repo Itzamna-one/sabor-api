@@ -204,6 +204,9 @@ export default async function handler(req, res) {
     ? (language === 'en' ? 'Latin food specialist' : 'especialista en comida latina')
     : (language === 'en' ? 'general food discovery expert' : 'experto gastronómico general');
 
+  // Detect plan queries (works for both EN and ES since Flutter always includes "plan my full food day")
+  const isPlanQuery = query.toLowerCase().includes('plan my full food day');
+
   // Check cache first (skip cache for street food / vendor / similar - always fresh)
   const cacheKey = getCacheKey(query, city, tier, language, filterNeighborhood);
   const skipCache = isStreetFood
@@ -227,7 +230,7 @@ export default async function handler(req, res) {
         {
           role: "user",
           content: language === 'en'
-          ? `You are SABOR, a ${foodContext} in ${city}. ${query.toLowerCase().includes('plan my full food day') ? 'You are a personal food concierge. Create a detailed day itinerary with morning coffee or breakfast, lunch, afternoon snack, and dinner. Include real restaurant names, neighborhoods, dish recommendations with prices, and running total toward the budget. Keep total under the stated budget.' : isStreetFood ? `Find street vendors, food carts, and informal street food sellers ONLY for this specific search: "${query}". Results must match the exact type of street food being searched. NO restaurants, NO bakeries unless specifically searched. Include typical locations, neighborhoods, and days/hours they operate.` : isLatinQuery ? 'Find the best Latin restaurants for this search.' : 'Find the BEST restaurants for this search across ALL cuisines. Do NOT default to Latin food unless asked.'}
+          ? `You are SABOR, a ${foodContext} in ${city}. ${isPlanQuery ? 'You are a personal food concierge. Create a detailed day itinerary with morning coffee or breakfast, lunch, afternoon snack, and dinner. Include real restaurant names, neighborhoods, dish recommendations with prices, and running total toward the budget. Keep total under the stated budget.' : isStreetFood ? `Find street vendors, food carts, and informal street food sellers ONLY for this specific search: "${query}". Results must match the exact type of street food being searched. NO restaurants, NO bakeries unless specifically searched. Include typical locations, neighborhoods, and days/hours they operate.` : isLatinQuery ? 'Find the best Latin restaurants for this search.' : 'Find the BEST restaurants for this search across ALL cuisines. Do NOT default to Latin food unless asked.'}
 
 ${neighborhoodContext}
 ${personalization}
@@ -256,13 +259,13 @@ Respond ONLY with valid JSON — no markdown, no backticks:
 }
 
 Critical rules:
-- Exactly ${tier === 'premium' ? '6' : '3'} unique results
+- Exactly ${isPlanQuery ? '4' : (tier === 'premium' ? '6' : '3')} unique results
 - ${rotationNote || "Vary the restaurants"}
 - Respect radius ${tierConfig.radius}
 - ${isPremium ? "Can recommend from any neighborhood in Chicago" : `Stay within ${tierConfig.radius} of the user`}
 - Real authentic restaurants in Chicago
 - Never repeat the same 3 spots`
-          : `Eres SABOR, un ${foodContext} en ${city}. ${isStreetFood ? 'Encuentra vendedores ambulantes, carritos de comida, trocas de tacos y vendedores informales — NO restaurantes establecidos. Incluye sus ubicaciones típicas y barrios.' : isLatinQuery ? 'Encuentra los mejores restaurantes latinos para esta búsqueda.' : 'Encuentra los MEJORES restaurantes en TODAS las cocinas. NO te limites a comida latina a menos que se pida.'}
+          : `Eres SABOR, un ${foodContext} en ${city}. ${isPlanQuery ? 'Eres un concierge personal de comida. Crea un itinerario detallado del día con café o desayuno, almuerzo, snack de la tarde y cena. Incluye nombres reales de restaurantes, barrios, platos recomendados con precios, y el total acumulado hacia el presupuesto. Mantén el total bajo el presupuesto indicado.' : isStreetFood ? 'Encuentra vendedores ambulantes, carritos de comida, trocas de tacos y vendedores informales — NO restaurantes establecidos. Incluye sus ubicaciones típicas y barrios.' : isLatinQuery ? 'Encuentra los mejores restaurantes latinos para esta búsqueda.' : 'Encuentra los MEJORES restaurantes en TODAS las cocinas. NO te limites a comida latina a menos que se pida.'}
 
 ${neighborhoodContext}
 ${personalization}
@@ -289,7 +292,7 @@ Responde SOLO con JSON válido — sin markdown, sin backticks:
 }
 
 Reglas críticas:
-- Exactamente 3 resultados únicos
+- Exactamente ${isPlanQuery ? '4' : (tier === 'premium' ? '6' : '3')} resultados únicos
 - ${rotationNote || "Varía los restaurantes"}
 - Respeta radio ${tierConfig.radius}
 - ${isPremium ? "Puedes recomendar de cualquier barrio de Chicago" : `Mantente dentro de ${tierConfig.radius} del usuario`}
