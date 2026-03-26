@@ -177,6 +177,9 @@ export default async function handler(req, res) {
     ? `NUNCA repitas estos restaurantes: ${previousRestaurants.join(", ")}.`
     : "";
 
+  // Detect plan queries early (needed by personalization)
+  const isPlanQuery = query.toLowerCase().includes('plan my full food day');
+
   // Personalization
   const personalization = hasProfile
     ? (language === 'en'
@@ -205,9 +208,6 @@ export default async function handler(req, res) {
   const foodContext = isLatinQuery
     ? (language === 'en' ? 'Latin food specialist' : 'especialista en comida latina')
     : (language === 'en' ? 'general food discovery expert' : 'experto gastronómico general');
-
-  // Detect plan queries (works for both EN and ES since Flutter always includes "plan my full food day")
-  const isPlanQuery = query.toLowerCase().includes('plan my full food day');
 
   // Check cache first (skip cache for street food / vendor / similar - always fresh)
   const cacheKey = getCacheKey(query, city, tier, language, filterNeighborhood);
