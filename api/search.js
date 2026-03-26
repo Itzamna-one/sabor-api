@@ -225,12 +225,12 @@ export default async function handler(req, res) {
   try {
     const message = await client.messages.create({
       model: tier === "premium" ? "claude-sonnet-4-20250514" : "claude-haiku-4-5-20251001",
-      max_tokens: tier === 'premium' ? 900 : 500,
+      max_tokens: isPlanQuery ? 1400 : (tier === 'premium' ? 900 : 500),
       messages: [
         {
           role: "user",
           content: language === 'en'
-          ? `You are SABOR, a ${foodContext} in ${city}. ${isPlanQuery ? 'You are a personal food concierge. Create a detailed day itinerary with morning coffee or breakfast, lunch, afternoon snack, and dinner. Include real restaurant names, neighborhoods, dish recommendations with prices, and running total toward the budget. Keep total under the stated budget.' : isStreetFood ? `Find street vendors, food carts, and informal street food sellers ONLY for this specific search: "${query}". Results must match the exact type of street food being searched. NO restaurants, NO bakeries unless specifically searched. Include typical locations, neighborhoods, and days/hours they operate.` : isLatinQuery ? 'Find the best Latin restaurants for this search.' : 'Find the BEST restaurants for this search across ALL cuisines. Do NOT default to Latin food unless asked.'}
+          ? `You are SABOR, a ${foodContext} in ${city}. ${isPlanQuery ? 'You are a personal food concierge. Create a full-day food itinerary: morning coffee/breakfast, lunch, afternoon snack, and dinner. For EACH stop, recommend specific menu items with dollar prices (e.g. "Cortado $4.50, Tres Leches Pancakes $12"). Show a running total after each stop like "Running total: $16.50". The grand total MUST stay under the stated budget. Use real restaurant names and neighborhoods in Chicago.' : isStreetFood ? `Find street vendors, food carts, and informal street food sellers ONLY for this specific search: "${query}". Results must match the exact type of street food being searched. NO restaurants, NO bakeries unless specifically searched. Include typical locations, neighborhoods, and days/hours they operate.` : isLatinQuery ? 'Find the best Latin restaurants for this search.' : 'Find the BEST restaurants for this search across ALL cuisines. Do NOT default to Latin food unless asked.'}
 
 ${neighborhoodContext}
 ${personalization}
@@ -244,13 +244,13 @@ ${tagInstruction}
 
 Respond ONLY with valid JSON — no markdown, no backticks:
 {
-  "summary": "1-2 vibrant sentences in English${isPremium ? ", mention the neighborhood" : ""}",
+  "summary": "${isPlanQuery ? "1-2 sentences previewing the day plan with total budget used" : `1-2 vibrant sentences in English${isPremium ? ", mention the neighborhood" : ""}`}",
   "neighborhood": "${currentNeighborhood || "Chicago"}",
   "results": [
     {
       "name": "Name — Exact Neighborhood",
       "emoji": "food emoji",
-      "description": "2 authentic sentences about the spot — mention cuisine type and what makes it special",
+      "description": "${isPlanQuery ? "List specific dishes with prices like: Cortado $4.50, Churro $3 · Running total: $7.50" : "2 authentic sentences about the spot — mention cuisine type and what makes it special"}",
       "tag": "appropriate tag based on tier",
       "distance": "0.0mi",
       "neighborhood": "neighborhood name"
@@ -265,7 +265,7 @@ Critical rules:
 - ${isPremium ? "Can recommend from any neighborhood in Chicago" : `Stay within ${tierConfig.radius} of the user`}
 - Real authentic restaurants in Chicago
 - Never repeat the same 3 spots`
-          : `Eres SABOR, un ${foodContext} en ${city}. ${isPlanQuery ? 'Eres un concierge personal de comida. Crea un itinerario detallado del día con café o desayuno, almuerzo, snack de la tarde y cena. Incluye nombres reales de restaurantes, barrios, platos recomendados con precios, y el total acumulado hacia el presupuesto. Mantén el total bajo el presupuesto indicado.' : isStreetFood ? 'Encuentra vendedores ambulantes, carritos de comida, trocas de tacos y vendedores informales — NO restaurantes establecidos. Incluye sus ubicaciones típicas y barrios.' : isLatinQuery ? 'Encuentra los mejores restaurantes latinos para esta búsqueda.' : 'Encuentra los MEJORES restaurantes en TODAS las cocinas. NO te limites a comida latina a menos que se pida.'}
+          : `Eres SABOR, un ${foodContext} en ${city}. ${isPlanQuery ? 'Eres un concierge personal de comida. Crea un itinerario completo del día: café/desayuno, almuerzo, snack y cena. Para CADA parada, recomienda platillos específicos del menú con precios en dólares (ej: "Cortado $4.50, Pancakes de Tres Leches $12"). Muestra un total acumulado después de cada parada como "Total acumulado: $16.50". El total final DEBE quedar bajo el presupuesto indicado. Usa nombres reales de restaurantes y barrios de Chicago.' : isStreetFood ? 'Encuentra vendedores ambulantes, carritos de comida, trocas de tacos y vendedores informales — NO restaurantes establecidos. Incluye sus ubicaciones típicas y barrios.' : isLatinQuery ? 'Encuentra los mejores restaurantes latinos para esta búsqueda.' : 'Encuentra los MEJORES restaurantes en TODAS las cocinas. NO te limites a comida latina a menos que se pida.'}
 
 ${neighborhoodContext}
 ${personalization}
@@ -277,13 +277,13 @@ ${tagInstruction}
 
 Responde SOLO con JSON válido — sin markdown, sin backticks:
 {
-  "summary": "1-2 frases vibrantes en español/spanglish${isPremium ? ", menciona el barrio" : ""}",
+  "summary": "${isPlanQuery ? "1-2 frases previsualizando el plan del día con el total del presupuesto usado" : `1-2 frases vibrantes en español/spanglish${isPremium ? ", menciona el barrio" : ""}`}",
   "neighborhood": "${currentNeighborhood || "Chicago"}",
   "results": [
     {
       "name": "Nombre — Barrio exacto",
       "emoji": "emoji de comida",
-      "description": "2 frases auténticas sobre el spot — menciona el tipo de cocina y qué lo hace especial",
+      "description": "${isPlanQuery ? "Lista platillos específicos con precios: Cortado $4.50, Churro $3 · Total acumulado: $7.50" : "2 frases auténticas sobre el spot — menciona el tipo de cocina y qué lo hace especial"}",
       "tag": "tag apropiado según tier",
       "distance": "0.0mi",
       "neighborhood": "nombre del barrio"
