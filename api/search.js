@@ -105,7 +105,7 @@ function getNeighborhood(address) {
     if (CHICAGO_NEIGHBORHOODS[zip]) return CHICAGO_NEIGHBORHOODS[zip];
   }
   // Check for known suburb names in address
-  const suburbs = ['Cicero', 'Berwyn', 'Oak Lawn', 'Oak Park', 'Evanston', 
+  const suburbs = ['Cicero', 'Berwyn', 'Oak Lawn', 'Oak Park', 'Evanston',
     'Skokie', 'Niles', 'Norridge', 'Harwood Heights', 'Elmwood Park',
     'River Forest', 'Forest Park', 'Maywood', 'Bellwood', 'Melrose Park'];
   for (const suburb of suburbs) {
@@ -204,9 +204,13 @@ export default async function handler(req, res) {
     ? (language === 'en' ? 'Latin food specialist' : 'especialista en comida latina')
     : (language === 'en' ? 'general food discovery expert' : 'experto gastronómico general');
 
-  // Check cache first (skip cache for street food - always fresh)
+  // Check cache first (skip cache for street food / vendor / similar - always fresh)
   const cacheKey = getCacheKey(query, city, tier, language, filterNeighborhood);
-  const skipCache = isStreetFood || query.toLowerCase().includes('vendor') || query.toLowerCase().includes('truck') || query.toLowerCase().includes('similar to');
+  const skipCache = isStreetFood
+    || query.toLowerCase().includes('vendor')
+    || query.toLowerCase().includes('truck')
+    || query.toLowerCase().includes('similar to')
+    || query.toLowerCase().includes('plan my');
   if (!skipCache) {
     const cached = getCached(cacheKey);
     if (cached) {
@@ -297,9 +301,22 @@ Reglas críticas:
 
     const raw = message.content[0].text.trim();
     const clean = raw.replace(/^```json\n?|^```\n?|\n?```$/g, "").trim();
-    const parsed = JSON.parse(clean);
-    setCache(cacheKey, parsed);
-    // Enhance neighborhood data using lookup table
+
+    let parsed;
+    try {
+      parsed = JSON.parse(clean);
+    } catch (parseErr) {
+      console.error("JSON parse failed. Raw AI response:", raw.substring(0, 500));
+      // Attempt recovery: extract JSON object from response
+      const jsonMatch = clean.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      } else {
+        return res.status(500).json({ error: "AI response parse error", hint: "Response was not valid JSON" });
+      }
+    }
+
+    // Enhance neighborhood data using ZIP lookup table
     if (parsed.results) {
       parsed.results = parsed.results.map(r => {
         if (r.address) {
@@ -309,11 +326,11 @@ Reglas críticas:
         return r;
       });
     }
+
+    if (!skipCache) setCache(cacheKey, parsed);
     return res.status(200).json(parsed);
   } catch (err) {
-    console.error("SABOR API error:", err);
-    if (err instanceof SyntaxError)
-      return res.status(500).json({ error: "AI response parse error" });
+    console.error("SABOR API error:", err.message);
     return res.status(500).json({ error: "Search failed", message: err.message });
   }
 }

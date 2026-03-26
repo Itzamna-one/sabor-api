@@ -1,4 +1,4 @@
-const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args));
+// api/events.js — Dynamic events with upcoming dates
 
 // Dynamic dates helper
 function getUpcomingDay(targetDay, weeksAhead = 0) {
@@ -275,8 +275,17 @@ export default async function handler(req, res) {
 
   if (budget) {
     const maxBudget = parseInt(budget);
-    events = events.filter(e => e.priceNum <= maxBudget);
+    if (!isNaN(maxBudget)) {
+      events = events.filter(e => e.priceNum <= maxBudget);
+    }
   }
+
+  // Sort by date (soonest first)
+  events.sort((a, b) => {
+    const dateA = new Date(a.date);
+    const dateB = new Date(b.date);
+    return dateA - dateB;
+  });
 
   return res.status(200).json({ events, total: events.length });
 }
