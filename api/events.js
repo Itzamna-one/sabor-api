@@ -568,40 +568,137 @@ const SABOR_EVENTS = [
   },
 ];
 
+// ── TICKETMASTER API ──
+async function fetchTicketmasterEvents(city) {
+  const apiKey = process.env.TICKETMASTER_API_KEY;
+  if (!apiKey) return [];
+
+  try {
+    const cityName = city.split(',')[0].trim();
+    const today = new Date();
+    const startDate = today.toISOString().split('.')[0] + 'Z';
+    const endDate = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('.')[0] + 'Z';
+
+    // Search food/drink related events — use keywords since TM doesn't have a food segment
+    const keywords = ['food', 'tasting', 'brunch', 'dinner', 'culinary', 'chef', 'wine', 'cocktail', 'happy hour', 'food festival'];
+    const keyword = keywords[Math.floor(Math.random() * keywords.length)];
+
+    const url = `https://app.ticketmaster.com/discovery/v2/events.json?keyword=${encodeURIComponent(keyword)}&city=${encodeURIComponent(cityName)}&startDateTime=${startDate}&endDateTime=${endDate}&size=10&sort=date,asc&apikey=${apiKey}`;
+
+    const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!resp.ok) return [];
+
+    const data = await resp.json();
+    const tmEvents = data?._embedded?.events || [];
+
+    return tmEvents.map((e, i) => {
+      const venue = e._embedded?.venues?.[0] || {};
+      const startLocal = e.dates?.start?.localDate || '';
+      const startTime = e.dates?.start?.localTime || '';
+      const priceMin = e.priceRanges?.[0]?.min;
+      const priceMax = e.priceRanges?.[0]?.max;
+      const priceStr = priceMin ? (priceMax && priceMax !== priceMin ? `$${priceMin} - $${priceMax}` : `$${priceMin}`) : 'See event';
+      const img = e.images?.find(img => img.width >= 300)?.url || null;
+
+      // Format date nicely
+      const eventDate = new Date(startLocal + 'T' + (startTime || '00:00:00'));
+      const isToday = startLocal === today.toISOString().split('T')[0];
+      const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      const dateStr = isToday
+        ? `Today, ${months[eventDate.getMonth()]} ${eventDate.getDate()}`
+        : `${days[eventDate.getDay()]}, ${months[eventDate.getMonth()]} ${eventDate.getDate()}`;
+
+      // Format time
+      let timeStr = '';
+      if (startTime) {
+        const [h, m] = startTime.split(':');
+        const hour = parseInt(h);
+        timeStr = `${hour > 12 ? hour - 12 : hour}:${m} ${hour >= 12 ? 'PM' : 'AM'}`;
+      }
+
+      return {
+        id: `tm_${e.id}`,
+        title: e.name,
+        description: (e.info || e.pleaseNote || e.name || '').substring(0, 200),
+        venue: venue.name || 'TBA',
+        neighborhood: venue.city?.name || cityName,
+        city: city,
+        date: dateStr,
+        time: timeStr,
+        price: priceStr,
+        priceNum: priceMin || 0,
+        category: 'live',
+        vibe: 'Live Event',
+        emoji: '🎟️',
+        image: img,
+        premiumOnly: false,
+        earlyAccess: false,
+        tags: ['live', 'ticketmaster', keyword],
+        source: 'Ticketmaster',
+        url: e.url || null,
+      };
+    });
+  } catch (err) {
+    console.error('Ticketmaster fetch error:', err.message);
+    return [];
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Cache-Control', 's-maxage=3600');
+  res.setHeader('Cache-Control', 's-maxage=1800');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const { city = 'Chicago, IL', category, budget } = req.query;
 
-  let events = SABOR_EVENTS.filter(e =>
+  // Fetch Ticketmaster events in parallel with curated
+  let tmEvents = [];
+  try {
+    tmEvents = await fetchTicketmasterEvents(city);
+  } catch (_) {}
+
+  // Curated SABOR events
+  let curatedEvents = SABOR_EVENTS.filter(e =>
     e.city.toLowerCase().includes(city.split(',')[0].toLowerCase())
   );
 
+  // Merge: live events first, then curated (tagged differently)
+  let allEvents = [...tmEvents, ...curatedEvents];
+
   if (category && category !== 'all') {
-    events = events.filter(e => e.category === category || e.tags.includes(category));
+    if (category === 'live') {
+      allEvents = allEvents.filter(e => e.source === 'Ticketmaster');
+    } else {
+      allEvents = allEvents.filter(e => e.category === category || e.tags.includes(category));
+    }
   }
 
   if (budget) {
     const maxBudget = parseInt(budget);
     if (!isNaN(maxBudget)) {
-      events = events.filter(e => e.priceNum <= maxBudget);
+      allEvents = allEvents.filter(e => e.priceNum <= maxBudget);
     }
   }
 
-  // Prioritize: today's events first, then soonest upcoming
+  // Sort: today first, then live events, then by date
   const todayStr = 'Today,';
-  events.sort((a, b) => {
+  allEvents.sort((a, b) => {
     const aToday = a.date.startsWith(todayStr) ? 0 : 1;
     const bToday = b.date.startsWith(todayStr) ? 0 : 1;
     if (aToday !== bToday) return aToday - bToday;
-    const dateA = new Date(a.date.replace('Today,', new Date().toDateString()));
-    const dateB = new Date(b.date.replace('Today,', new Date().toDateString()));
-    return dateA - dateB;
+    // Live events before curated within same date
+    const aLive = a.source === 'Ticketmaster' ? 0 : 1;
+    const bLive = b.source === 'Ticketmaster' ? 0 : 1;
+    if (aLive !== bLive) return aLive - bLive;
+    return 0;
   });
 
-  return res.status(200).json({ events, total: events.length });
+  return res.status(200).json({
+    events: allEvents,
+    total: allEvents.length,
+    sources: { ticketmaster: tmEvents.length, curated: curatedEvents.length },
+  });
 }

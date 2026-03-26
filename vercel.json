@@ -15,6 +15,9 @@
     },
     "api/neighborhoods.js": {
       "maxDuration": 30
+    },
+    "api/events.js": {
+      "maxDuration": 15
     }
   },
   "headers": [
