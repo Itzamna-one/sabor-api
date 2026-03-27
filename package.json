@@ -4,7 +4,8 @@
   "description": "SABOR Latino Food Discovery — Vercel Serverless Backend",
   "type": "module",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0"
+    "@anthropic-ai/sdk": "^0.39.0",
+    "firebase-admin": "^12.0.0"
   },
   "engines": {
     "node": ">=18"
