@@ -258,7 +258,7 @@ export default async function handler(req, res) {
   try {
     const message = await client.messages.create({
       model: tier === "premium" ? "claude-sonnet-4-20250514" : "claude-haiku-4-5-20251001",
-      max_tokens: isPlanQuery ? 1400 : (tier === 'premium' ? 900 : 500),
+      max_tokens: isPlanQuery ? 1400 : (tier === 'premium' ? 900 : 700),
       messages: [
         {
           role: "user",
@@ -288,8 +288,8 @@ Respond ONLY with valid JSON — no markdown, no backticks:
       "description": "${isPlanQuery ? "List dishes with prices: Cortado $4.50, Churro $3 · Food: $7.50 + tip $1.13 · Running total: $8.63 / $100" : conSabor ? "2 vivid sentences — describe the food with passion, then bridge it to Latin culture (compare flavors, suggest a Latin pairing, or connect food traditions). Be specific about dishes." : "2 vivid sentences about the spot — be opinionated, mention specific dishes and what makes them hit different. No generic praise."}",
       "tag": "appropriate tag based on tier",
       "distance": "0.0mi",
-      "address": "Full street address with ZIP code (e.g. 1234 W 18th St, Chicago, IL 60608)",
-      "neighborhood": "MUST be the restaurant's ACTUAL Chicago neighborhood — use this list ONLY: ${Object.keys(NEIGHBORHOOD_VIBES).join(', ')}, The Loop, South Loop, West Loop, River North, Lincoln Park, Lakeview, Chinatown, Hyde Park, Uptown, Edgewater, Rogers Park, Albany Park, Noble Square, Streeterville, Near North Side, Gage Park, Belmont Cragin"
+      "address": "full street address with ZIP (e.g. 1234 W 18th St, Chicago, IL 60608)",
+      "neighborhood": "actual Chicago neighborhood name"
     }
   ]
 }
@@ -327,8 +327,8 @@ Responde SOLO con JSON válido — sin markdown, sin backticks:
       "description": "${isPlanQuery ? "Lista platillos con precios: Cortado $4.50, Churro $3 · Comida: $7.50 + propina $1.13 · Total acumulado: $8.63 / $100" : conSabor ? "2 frases vividas — describe la comida con pasión, luego conéctala con la cultura latina (compara sabores, sugiere un complemento latino, o conecta tradiciones). Sé específico con los platillos." : "2 frases vividas sobre el spot — sé opinado, menciona platillos específicos y qué los hace únicos. Nada de elogios genéricos."}",
       "tag": "tag apropiado según tier",
       "distance": "0.0mi",
-      "address": "Dirección completa con código postal (ej: 1234 W 18th St, Chicago, IL 60608)",
-      "neighborhood": "DEBE ser el barrio REAL del restaurante — usa SOLO esta lista: ${Object.keys(NEIGHBORHOOD_VIBES).join(', ')}, The Loop, South Loop, West Loop, River North, Lincoln Park, Lakeview, Chinatown, Hyde Park, Uptown, Edgewater, Rogers Park, Albany Park, Noble Square, Streeterville, Near North Side, Gage Park, Belmont Cragin"
+      "address": "dirección completa con ZIP (ej: 1234 W 18th St, Chicago, IL 60608)",
+      "neighborhood": "nombre real del barrio de Chicago"
     }
   ]
 }
