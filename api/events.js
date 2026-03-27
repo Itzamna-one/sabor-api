@@ -622,7 +622,7 @@ async function fetchTicketmasterEvents(city) {
       if (seen.has(e.id)) return false;
       seen.add(e.id);
       return true;
-    }).slice(0, 15);
+    }).slice(0, 8);
 
     return tmEvents.map((e, i) => {
       const venue = e._embedded?.venues?.[0] || {};
