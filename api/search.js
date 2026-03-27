@@ -181,6 +181,31 @@ export default async function handler(req, res) {
   // Detect plan queries early (needed by personalization)
   const isPlanQuery = query.toLowerCase().includes('plan my full food day');
 
+  // Time-aware planning — determine what meals are still relevant
+  const now = new Date();
+  const currentHour = now.getHours();
+  // Determine remaining meals based on current time
+  let timeContext = '';
+  let planStops = 4;
+  if (isPlanQuery) {
+    if (currentHour >= 20) {        // 8pm+: late night only
+      timeContext = 'It\'s late evening. Plan a late-night food run: 1-2 stops — a dinner spot and/or a late-night snack (taquerias, diners, dessert bars that are open late). Skip breakfast/lunch/afternoon — the day is almost over.';
+      planStops = 2;
+    } else if (currentHour >= 17) { // 5-8pm: dinner + dessert
+      timeContext = 'It\'s evening now. Start the plan with dinner — skip breakfast and lunch (it\'s too late for those). Plan dinner + a dessert or after-dinner drink spot. 2-3 stops max.';
+      planStops = 3;
+    } else if (currentHour >= 14) { // 2-5pm: afternoon snack + dinner
+      timeContext = 'It\'s mid-afternoon. Skip breakfast and lunch (too late). Start with an afternoon coffee or snack, then plan dinner. 2-3 stops.';
+      planStops = 3;
+    } else if (currentHour >= 11) { // 11am-2pm: lunch onward
+      timeContext = 'It\'s around lunchtime. Skip breakfast (too late). Start with lunch, then afternoon snack, then dinner. 3 stops.';
+      planStops = 3;
+    } else {                         // Before 11am: full day
+      timeContext = 'It\'s morning — plan the full day: breakfast/coffee, lunch, afternoon snack, and dinner. 4 stops.';
+      planStops = 4;
+    }
+  }
+
   // Personalization
   const personalization = hasProfile
     ? (language === 'en'
@@ -237,7 +262,7 @@ export default async function handler(req, res) {
           content: language === 'en'
           ? `You are SABOR — not a generic food finder, but a bold, warm, opinionated food friend who knows every block. You speak with flavor: vivid, confident, the kind of friend who grabs your arm and says "trust me, you NEED to try this." You're a ${foodContext} in ${city}.${conSabor ? ' CON SABOR MODE: You bridge every cuisine through Latin culture. Compare dishes to Latin equivalents ("this broth hits like a good pozole"), suggest a Latin pairing for each spot ("pair it with a horchata from the shop next door"), and drop cultural knowledge that connects food traditions across the world. You celebrate ALL cuisines through the lens of someone raised on Latin flavors.' : ''}
 
-${isPlanQuery ? 'Create a full-day food itinerary: morning coffee/breakfast, lunch, afternoon snack, and dinner. IMPORTANT: Mix different cuisines across the day — do NOT make every stop the same cuisine. Include a variety (e.g. a coffee shop for morning, maybe a Thai or Japanese lunch, a Mexican snack spot, an Italian dinner). Respect the user\'s preferences but add variety. For EACH stop, recommend specific menu items with dollar prices for EACH person (e.g. "Cortado $4.50, Avocado Toast $11"). If this is for multiple people, list items per person and show the combined cost.\n\nBUDGET & TIPS: The user\'s stated budget is their TOTAL spend including tips. Reserve 20% of the budget for tips. For example, if budget is $100, plan food totaling ~$83 max, then add ~$17 tip. Show the running total AFTER each stop like: "Food: $14.50 + tip ~$2.90 · Running total: $17.40 / $100". For coffee shops or counter-service spots, use 15% tip. For sit-down restaurants, use 20%. The FINAL grand total (food + all tips) MUST stay under the stated budget.\n\nUse real restaurant names and neighborhoods in Chicago. Include the neighborhood in each result\'s "neighborhood" field.' : isStreetFood ? `Find street vendors, food carts, and informal street food sellers ONLY for this specific search: "${query}". Results must match the exact type of street food being searched. NO restaurants, NO bakeries unless specifically searched. Include typical locations, neighborhoods, and days/hours they operate.` : isLatinQuery ? 'Find the best Latin restaurants for this search.' : 'Find the BEST restaurants for this search across ALL cuisines. Do NOT default to Latin food unless asked.'}
+${isPlanQuery ? `TIME AWARENESS: ${timeContext}\n\nCreate a food itinerary starting from NOW. ONLY include meals that make sense for the current time — do NOT suggest breakfast at 7pm or lunch at 9pm. ${planStops <= 2 ? 'Keep it tight — ' + planStops + ' stops max.' : 'Plan ' + planStops + ' stops.'} IMPORTANT: Mix different cuisines across the stops — do NOT make every stop the same cuisine. Include a variety (e.g. a coffee shop for morning, maybe a Thai or Japanese lunch, a Mexican snack spot, an Italian dinner). Respect the user\'s preferences but add variety. For EACH stop, recommend specific menu items with dollar prices for EACH person (e.g. "Cortado $4.50, Avocado Toast $11"). If this is for multiple people, list items per person and show the combined cost.\n\nBUDGET & TIPS: The user\'s stated budget is their TOTAL spend including tips. Reserve 20% of the budget for tips. For example, if budget is $100, plan food totaling ~$83 max, then add ~$17 tip. Show the running total AFTER each stop like: "Food: $14.50 + tip ~$2.90 · Running total: $17.40 / $100". For coffee shops or counter-service spots, use 15% tip. For sit-down restaurants, use 20%. The FINAL grand total (food + all tips) MUST stay under the stated budget.\n\nUse real restaurant names and neighborhoods in Chicago. Include the neighborhood in each result\'s "neighborhood" field.` : isStreetFood ? `Find street vendors, food carts, and informal street food sellers ONLY for this specific search: "${query}". Results must match the exact type of street food being searched. NO restaurants, NO bakeries unless specifically searched. Include typical locations, neighborhoods, and days/hours they operate.` : isLatinQuery ? 'Find the best Latin restaurants for this search.' : 'Find the BEST restaurants for this search across ALL cuisines. Do NOT default to Latin food unless asked.'}
 
 ${neighborhoodContext}
 ${personalization}
@@ -266,7 +291,7 @@ Respond ONLY with valid JSON — no markdown, no backticks:
 }
 
 Critical rules:
-- Exactly ${isPlanQuery ? '4' : (tier === 'premium' ? '6' : '3')} unique results
+- Exactly ${isPlanQuery ? String(planStops) : (tier === 'premium' ? '6' : '3')} unique results
 - ${rotationNote || "Vary the restaurants"}
 - Respect radius ${tierConfig.radius}
 - ${isPremium ? "Can recommend from any neighborhood in Chicago" : `Stay within ${tierConfig.radius} of the user`}
@@ -275,7 +300,7 @@ Critical rules:
 - Write descriptions with FLAVOR — no bland generic sentences like "great atmosphere" or "worth a visit". Name specific dishes, textures, flavors.${conSabor ? '\n- CON SABOR: Every description MUST include a Latin cultural bridge — a comparison, pairing suggestion, or flavor connection to Latin cuisine.' : ''}`
           : `Eres SABOR — no un buscador genérico, sino un amigo foodie con sabor, opinión y calle. Hablas con calor: seguro, vibrante, como ese compa que te jala del brazo y dice "tienes que probar esto." Eres un ${foodContext} en ${city}.${conSabor ? ' MODO CON SABOR: Conectas cada cocina con la cultura latina. Compara platillos con sus equivalentes latinos ("este caldo pega como un buen pozole"), sugiere un complemento latino para cada spot ("acompáñalo con una horchata de la tienda de al lado"), y suelta conocimiento cultural que conecta tradiciones culinarias del mundo. Celebras TODAS las cocinas a través de los ojos de alguien criado con sabores latinos.' : ''}
 
-${isPlanQuery ? 'Crea un itinerario completo del día: café/desayuno, almuerzo, snack y cena. IMPORTANTE: Mezcla diferentes cocinas durante el día — NO hagas cada parada de la misma cocina. Incluye variedad (ej: cafetería por la mañana, almuerzo tailandés o japonés, snack mexicano, cena italiana). Respeta las preferencias del usuario pero agrega variedad. Para CADA parada, recomienda platillos específicos del menú con precios en dólares por CADA persona (ej: "Cortado $4.50, Avocado Toast $11"). Si es para varias personas, lista los items por persona y muestra el costo combinado.\n\nPRESUPUESTO Y PROPINAS: El presupuesto del usuario es su GASTO TOTAL incluyendo propinas. Reserva 20% del presupuesto para propinas. Ejemplo: si el presupuesto es $100, planea comida de ~$83 máximo, luego agrega ~$17 de propina. Muestra el total acumulado DESPUÉS de cada parada como: "Comida: $14.50 + propina ~$2.90 · Total acumulado: $17.40 / $100". Para cafeterías o servicio en mostrador, usa 15% propina. Para restaurantes con servicio en mesa, usa 20%. El TOTAL FINAL (comida + todas las propinas) DEBE quedar bajo el presupuesto indicado.\n\nUsa nombres reales de restaurantes y barrios de Chicago. Incluye el barrio en el campo "neighborhood" de cada resultado.' : isStreetFood ? 'Encuentra vendedores ambulantes, carritos de comida, trocas de tacos y vendedores informales — NO restaurantes establecidos. Incluye sus ubicaciones típicas y barrios.' : isLatinQuery ? 'Encuentra los mejores restaurantes latinos para esta búsqueda.' : 'Encuentra los MEJORES restaurantes en TODAS las cocinas. NO te limites a comida latina a menos que se pida.'}
+${isPlanQuery ? `HORA ACTUAL: ${timeContext}\n\nCrea un itinerario de comida empezando desde AHORA. SOLO incluye comidas que tengan sentido para la hora actual — NO sugieras desayuno a las 7pm ni almuerzo a las 9pm. ${planStops <= 2 ? 'Mantenlo corto — ' + planStops + ' paradas máximo.' : 'Planea ' + planStops + ' paradas.'} IMPORTANTE: Mezcla diferentes cocinas — NO hagas cada parada de la misma cocina. Incluye variedad (ej: cafetería por la mañana, almuerzo tailandés o japonés, snack mexicano, cena italiana). Respeta las preferencias del usuario pero agrega variedad. Para CADA parada, recomienda platillos específicos del menú con precios en dólares por CADA persona (ej: "Cortado $4.50, Avocado Toast $11"). Si es para varias personas, lista los items por persona y muestra el costo combinado.\n\nPRESUPUESTO Y PROPINAS: El presupuesto del usuario es su GASTO TOTAL incluyendo propinas. Reserva 20% del presupuesto para propinas. Ejemplo: si el presupuesto es $100, planea comida de ~$83 máximo, luego agrega ~$17 de propina. Muestra el total acumulado DESPUÉS de cada parada como: "Comida: $14.50 + propina ~$2.90 · Total acumulado: $17.40 / $100". Para cafeterías o servicio en mostrador, usa 15% propina. Para restaurantes con servicio en mesa, usa 20%. El TOTAL FINAL (comida + todas las propinas) DEBE quedar bajo el presupuesto indicado.\n\nUsa nombres reales de restaurantes y barrios de Chicago. Incluye el barrio en el campo "neighborhood" de cada resultado.` : isStreetFood ? 'Encuentra vendedores ambulantes, carritos de comida, trocas de tacos y vendedores informales — NO restaurantes establecidos. Incluye sus ubicaciones típicas y barrios.' : isLatinQuery ? 'Encuentra los mejores restaurantes latinos para esta búsqueda.' : 'Encuentra los MEJORES restaurantes en TODAS las cocinas. NO te limites a comida latina a menos que se pida.'}
 
 ${neighborhoodContext}
 ${personalization}
@@ -302,7 +327,7 @@ Responde SOLO con JSON válido — sin markdown, sin backticks:
 }
 
 Reglas críticas:
-- Exactamente ${isPlanQuery ? '4' : (tier === 'premium' ? '6' : '3')} resultados únicos
+- Exactamente ${isPlanQuery ? String(planStops) : (tier === 'premium' ? '6' : '3')} resultados únicos
 - ${rotationNote || "Varía los restaurantes"}
 - Respeta radio ${tierConfig.radius}
 - ${isPremium ? "Puedes recomendar de cualquier barrio de Chicago" : `Mantente dentro de ${tierConfig.radius} del usuario`}
