@@ -577,21 +577,43 @@ async function fetchTicketmasterEvents(city) {
     const cityName = city.split(',')[0].trim();
     const today = new Date();
     const startDate = today.toISOString().split('.')[0] + 'Z';
-    const endDate = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('.')[0] + 'Z';
+    const endDate = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('.')[0] + 'Z';
 
-    // Search multiple food keywords to maximize results — TM has no food segment
-    const keywords = ['food', 'brunch', 'dinner', 'culinary', 'wine', 'cocktail', 'food festival', 'tasting'];
-    // Pick 3 random keywords and search in parallel
-    const shuffled = keywords.sort(() => Math.random() - 0.5).slice(0, 3);
-    const fetches = shuffled.map(async (keyword) => {
-      try {
-        const url = `https://app.ticketmaster.com/discovery/v2/events.json?keyword=${encodeURIComponent(keyword)}&city=${encodeURIComponent(cityName)}&startDateTime=${startDate}&endDateTime=${endDate}&size=8&sort=date,asc&apikey=${apiKey}`;
-        const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
-        if (!resp.ok) return [];
-        const data = await resp.json();
-        return data?._embedded?.events || [];
-      } catch { return []; }
-    });
+    // Strategy: TM has very few "food" events. Search broader categories that pair with food
+    // (concerts, comedy, nightlife — things people do around a meal) plus direct food keywords.
+    // Use 3 parallel searches: 1 food-specific, 1 nightlife/entertainment, 1 broad city events
+    const fetches = [
+      // Food-specific: brunch and food are the most productive keywords
+      (async () => {
+        try {
+          const url = `https://app.ticketmaster.com/discovery/v2/events.json?keyword=food+brunch+dinner+tasting&city=${encodeURIComponent(cityName)}&startDateTime=${startDate}&endDateTime=${endDate}&size=10&sort=date,asc&apikey=${apiKey}`;
+          const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+          if (!resp.ok) return [];
+          const data = await resp.json();
+          return data?._embedded?.events || [];
+        } catch { return []; }
+      })(),
+      // Entertainment that pairs with food: comedy, live music, shows
+      (async () => {
+        try {
+          const url = `https://app.ticketmaster.com/discovery/v2/events.json?classificationName=music&city=${encodeURIComponent(cityName)}&startDateTime=${startDate}&endDateTime=${endDate}&size=6&sort=date,asc&apikey=${apiKey}`;
+          const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+          if (!resp.ok) return [];
+          const data = await resp.json();
+          return data?._embedded?.events || [];
+        } catch { return []; }
+      })(),
+      // Broad: arts, theatre, festivals
+      (async () => {
+        try {
+          const url = `https://app.ticketmaster.com/discovery/v2/events.json?classificationName=arts&city=${encodeURIComponent(cityName)}&startDateTime=${startDate}&endDateTime=${endDate}&size=6&sort=date,asc&apikey=${apiKey}`;
+          const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+          if (!resp.ok) return [];
+          const data = await resp.json();
+          return data?._embedded?.events || [];
+        } catch { return []; }
+      })(),
+    ];
 
     // Merge results and deduplicate by event ID
     const allResults = (await Promise.all(fetches)).flat();
@@ -600,7 +622,7 @@ async function fetchTicketmasterEvents(city) {
       if (seen.has(e.id)) return false;
       seen.add(e.id);
       return true;
-    }).slice(0, 10);
+    }).slice(0, 15);
 
     return tmEvents.map((e, i) => {
       const venue = e._embedded?.venues?.[0] || {};
@@ -645,7 +667,7 @@ async function fetchTicketmasterEvents(city) {
         image: img,
         premiumOnly: false,
         earlyAccess: false,
-        tags: ['live', 'ticketmaster', keyword],
+        tags: ['live', 'ticketmaster'],
         source: 'Ticketmaster',
         url: e.url || null,
       };
