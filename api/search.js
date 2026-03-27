@@ -137,6 +137,7 @@ export default async function handler(req, res) {
     previousRestaurants = [],
     language = 'es',
     conSabor = false,
+    localHour = null,
   } = req.body;
 
   if (!query) return res.status(400).json({ error: "Query is required" });
@@ -181,9 +182,9 @@ export default async function handler(req, res) {
   // Detect plan queries early (needed by personalization)
   const isPlanQuery = query.toLowerCase().includes('plan my full food day');
 
-  // Time-aware planning — determine what meals are still relevant
-  const now = new Date();
-  const currentHour = now.getHours();
+  // Time-aware planning — use client's local hour (phone knows real timezone)
+  // Fall back to server UTC if client doesn't send it
+  const currentHour = localHour != null ? parseInt(localHour) : new Date().getHours();
   // Determine remaining meals based on current time
   let timeContext = '';
   let planStops = 4;
