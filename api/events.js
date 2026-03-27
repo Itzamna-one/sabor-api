@@ -579,17 +579,28 @@ async function fetchTicketmasterEvents(city) {
     const startDate = today.toISOString().split('.')[0] + 'Z';
     const endDate = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('.')[0] + 'Z';
 
-    // Search food/drink related events — use keywords since TM doesn't have a food segment
-    const keywords = ['food', 'tasting', 'brunch', 'dinner', 'culinary', 'chef', 'wine', 'cocktail', 'happy hour', 'food festival'];
-    const keyword = keywords[Math.floor(Math.random() * keywords.length)];
+    // Search multiple food keywords to maximize results — TM has no food segment
+    const keywords = ['food', 'brunch', 'dinner', 'culinary', 'wine', 'cocktail', 'food festival', 'tasting'];
+    // Pick 3 random keywords and search in parallel
+    const shuffled = keywords.sort(() => Math.random() - 0.5).slice(0, 3);
+    const fetches = shuffled.map(async (keyword) => {
+      try {
+        const url = `https://app.ticketmaster.com/discovery/v2/events.json?keyword=${encodeURIComponent(keyword)}&city=${encodeURIComponent(cityName)}&startDateTime=${startDate}&endDateTime=${endDate}&size=8&sort=date,asc&apikey=${apiKey}`;
+        const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+        if (!resp.ok) return [];
+        const data = await resp.json();
+        return data?._embedded?.events || [];
+      } catch { return []; }
+    });
 
-    const url = `https://app.ticketmaster.com/discovery/v2/events.json?keyword=${encodeURIComponent(keyword)}&city=${encodeURIComponent(cityName)}&startDateTime=${startDate}&endDateTime=${endDate}&size=10&sort=date,asc&apikey=${apiKey}`;
-
-    const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
-    if (!resp.ok) return [];
-
-    const data = await resp.json();
-    const tmEvents = data?._embedded?.events || [];
+    // Merge results and deduplicate by event ID
+    const allResults = (await Promise.all(fetches)).flat();
+    const seen = new Set();
+    const tmEvents = allResults.filter(e => {
+      if (seen.has(e.id)) return false;
+      seen.add(e.id);
+      return true;
+    }).slice(0, 10);
 
     return tmEvents.map((e, i) => {
       const venue = e._embedded?.venues?.[0] || {};
