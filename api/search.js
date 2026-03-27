@@ -383,7 +383,7 @@ Reglas críticas:
     if (!skipCache) setCache(cacheKey, parsed);
     return res.status(200).json(parsed);
   } catch (err) {
-    console.error("SABOR API error:", err.message);
-    return res.status(500).json({ error: "Search failed", message: err.message });
+    console.error("SABOR API error:", err.message, err.status || '', JSON.stringify(err.error || {}).substring(0, 300));
+    return res.status(500).json({ error: "Search failed", message: err.message, status: err.status || null });
   }
 }
