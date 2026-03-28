@@ -142,6 +142,76 @@ const CITY_NEIGHBORHOODS = {
     { name: 'Route 30',         emoji: '🌮', vibe: 'Latin · Diverse' },
     { name: 'Campus Area',      emoji: '🍜', vibe: 'Student Eats' },
   ],
+  'Evansville, IN': [
+    { name: 'Downtown',         emoji: '🍷', vibe: 'Revitalized · Local' },
+    { name: 'West Franklin St', emoji: '🌮', vibe: 'Mexican · Latino' },
+    { name: 'North Side',       emoji: '🍗', vibe: 'BBQ · Comfort Food' },
+    { name: 'East Side',        emoji: '🌍', vibe: 'Diverse · Family' },
+    { name: 'Haynie\'s Corner', emoji: '💎', vibe: 'Arts District · Hidden Gems' },
+  ],
+
+  // ═══════════════════════════════════════
+  // ILLINOIS — ADDITIONAL CITIES
+  // ═══════════════════════════════════════
+  'Peoria, IL': [
+    { name: 'Downtown Peoria',  emoji: '🍷', vibe: 'Riverfront · Local' },
+    { name: 'University St',    emoji: '🍜', vibe: 'Student Eats · Asian' },
+    { name: 'War Memorial Dr',  emoji: '🌮', vibe: 'Latin · Diverse' },
+    { name: 'East Bluff',       emoji: '🍗', vibe: 'Soul Food · BBQ' },
+    { name: 'Heights',          emoji: '💎', vibe: 'Hidden Gems · Local' },
+  ],
+  'Bloomington, IL': [
+    { name: 'Downtown Bloomington', emoji: '🍷', vibe: 'Historic · Upscale' },
+    { name: 'Veterans Parkway',     emoji: '🌍', vibe: 'Diverse Corridor' },
+    { name: 'Normal (Uptown)',      emoji: '🍜', vibe: 'Student Eats · ISU' },
+    { name: 'East Side',            emoji: '🌮', vibe: 'Latin · Casual' },
+  ],
+  'Decatur, IL': [
+    { name: 'Downtown Decatur',  emoji: '🍷', vibe: 'Revitalized · Local' },
+    { name: 'Merchant Street',   emoji: '🍔', vibe: 'Classic American' },
+    { name: 'East Side',         emoji: '🌮', vibe: 'Mexican · Family' },
+    { name: 'South Side',        emoji: '🍗', vibe: 'BBQ · Comfort Food' },
+  ],
+  'DeKalb, IL': [
+    { name: 'Downtown DeKalb',  emoji: '🍜', vibe: 'Student Eats · NIU' },
+    { name: 'Lincoln Highway',  emoji: '🌮', vibe: 'Mexican · Diverse' },
+    { name: 'Sycamore',         emoji: '💎', vibe: 'Small Town · Hidden Gems' },
+    { name: 'Annie Glidden Rd', emoji: '🌍', vibe: 'Global · Casual' },
+  ],
+
+  // ═══════════════════════════════════════
+  // INDIANA — ADDITIONAL CITIES
+  // ═══════════════════════════════════════
+  'Bloomington, IN': [
+    { name: 'Downtown / Kirkwood', emoji: '🍷', vibe: 'Student Eats · IU' },
+    { name: '4th Street',          emoji: '🍜', vibe: 'Diverse · Asian' },
+    { name: 'East 3rd Street',     emoji: '🌮', vibe: 'Mexican · Casual' },
+    { name: 'College Mall Area',   emoji: '🌍', vibe: 'Diverse Corridor' },
+  ],
+  'Terre Haute, IN': [
+    { name: 'Downtown',         emoji: '🍷', vibe: 'Revitalized · Local' },
+    { name: 'Wabash Ave',       emoji: '🌮', vibe: 'Mexican · Family' },
+    { name: 'South Side',       emoji: '🍗', vibe: 'BBQ · Comfort Food' },
+    { name: 'ISU Campus Area',  emoji: '🍜', vibe: 'Student Eats' },
+  ],
+  'Lafayette, IN': [
+    { name: 'Downtown Lafayette', emoji: '🍷', vibe: 'Local · Eclectic' },
+    { name: 'Sagamore Parkway',   emoji: '🌍', vibe: 'Diverse Corridor' },
+    { name: 'West Lafayette',     emoji: '🍜', vibe: 'Purdue · Student Eats' },
+    { name: 'Main Street',        emoji: '🌮', vibe: 'Mexican · Casual' },
+  ],
+  'Muncie, IN': [
+    { name: 'Downtown Muncie',  emoji: '🍷', vibe: 'Revitalized · Local' },
+    { name: 'Village Area',     emoji: '🍜', vibe: 'Student Eats · BSU' },
+    { name: 'McGalliard Rd',    emoji: '🌍', vibe: 'Diverse · Casual' },
+    { name: 'South Side',       emoji: '🌮', vibe: 'Mexican · Family' },
+  ],
+  'Michigan City, IN': [
+    { name: 'Downtown',         emoji: '🍷', vibe: 'Lakefront · Local' },
+    { name: 'Franklin Street',  emoji: '🌮', vibe: 'Latin · Diverse' },
+    { name: 'Uptown Arts',      emoji: '💎', vibe: 'Arts District · Hidden' },
+    { name: 'Lighthouse Place', emoji: '🍔', vibe: 'Casual · Family' },
+  ],
 };
 
 export default async function handler(req, res) {

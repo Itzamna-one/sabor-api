@@ -568,6 +568,247 @@ const SABOR_EVENTS = [
   },
 ];
 
+// ═══════════════════════════════════════
+// INDIANAPOLIS CURATED EVENTS
+// ═══════════════════════════════════════
+const INDY_EVENTS = [
+  {
+    id: 'evt_indy_001',
+    title: 'Taco Tuesday Crawl — Mass Ave',
+    description: '$2 street tacos at 4 stops along Mass Ave. Margarita specials at every stop. SABOR guides the route.',
+    venue: 'Multiple Locations',
+    neighborhood: 'Mass Ave → Fountain Square',
+    city: 'Indianapolis, IN',
+    date: getUpcomingDay(2),
+    time: '5:00 PM - 9:00 PM',
+    price: '$15 suggested',
+    priceNum: 15,
+    category: 'happyhour',
+    vibe: 'Fun · Social',
+    emoji: '🌮',
+    image: null,
+    premiumOnly: false,
+    earlyAccess: false,
+    tags: ['tacos', 'crawl', 'happy hour', 'social'],
+    source: 'SABOR'
+  },
+  {
+    id: 'evt_indy_002',
+    title: 'BBQ & Blues on the Canal',
+    description: 'Smoked brisket, pulled pork, and live blues along the Indianapolis Canal Walk. Craft beer from local breweries.',
+    venue: 'Canal Walk',
+    neighborhood: 'Downtown',
+    city: 'Indianapolis, IN',
+    date: getUpcomingDay(6),
+    time: '12:00 PM - 7:00 PM',
+    price: 'Free entry',
+    priceNum: 0,
+    category: 'festival',
+    vibe: 'Family · Community',
+    emoji: '🍗',
+    image: null,
+    premiumOnly: false,
+    earlyAccess: false,
+    tags: ['bbq', 'blues', 'festival', 'free', 'family'],
+    source: 'SABOR'
+  },
+  {
+    id: 'evt_indy_003',
+    title: 'Fountain Square Food Walk',
+    description: 'Guided food tour through Fountain Square — 5 stops, 5 cuisines. Ethiopian, Mexican, Vietnamese, Southern, and Korean.',
+    venue: 'Fountain Square',
+    neighborhood: 'Fountain Square',
+    city: 'Indianapolis, IN',
+    date: getUpcomingDay(6),
+    time: '11:00 AM - 3:00 PM',
+    price: '$40',
+    priceNum: 40,
+    category: 'festival',
+    vibe: 'Cultural · Diverse',
+    emoji: '🌍',
+    image: null,
+    premiumOnly: false,
+    earlyAccess: true,
+    tags: ['food tour', 'diverse', 'cultural'],
+    source: 'SABOR'
+  },
+  {
+    id: 'evt_indy_004',
+    title: 'Mercado Night — Lafayette Square',
+    description: 'Open-air night market with 15+ Latin food vendors, live mariachi, and artisan goods. The heart of Indy\'s Latino scene.',
+    venue: 'Lafayette Square Mall Area',
+    neighborhood: 'Lafayette Square',
+    city: 'Indianapolis, IN',
+    date: getUpcomingDay(5),
+    time: '6:00 PM - 11:00 PM',
+    price: 'Free entry',
+    priceNum: 0,
+    category: 'festival',
+    vibe: 'Street Food · Cultural',
+    emoji: '🔥',
+    image: null,
+    premiumOnly: false,
+    earlyAccess: false,
+    tags: ['mercado', 'latin', 'night market', 'free', 'street food'],
+    source: 'SABOR'
+  },
+  {
+    id: 'evt_indy_005',
+    title: 'Brunch & Mimosas — Broad Ripple',
+    description: 'Bottomless mimosas, avocado toast flights, and live acoustic at three Broad Ripple brunch spots.',
+    venue: 'Multiple Locations',
+    neighborhood: 'Broad Ripple',
+    city: 'Indianapolis, IN',
+    date: getUpcomingDay(0),
+    time: '10:00 AM - 2:00 PM',
+    price: '$30',
+    priceNum: 30,
+    category: 'brunch',
+    vibe: 'Social · Chill',
+    emoji: '🥂',
+    image: null,
+    premiumOnly: false,
+    earlyAccess: false,
+    tags: ['brunch', 'mimosas', 'social'],
+    source: 'SABOR'
+  },
+];
+
+// ═══════════════════════════════════════
+// ROCKFORD / SPRINGFIELD / OTHER IL CURATED EVENTS
+// ═══════════════════════════════════════
+const IL_REGIONAL_EVENTS = [
+  {
+    id: 'evt_il_001',
+    title: 'Route 66 BBQ Fest',
+    description: 'Springfield\'s best pitmasters compete. Smoked ribs, brisket, and cornbread. Live country music and cold beer.',
+    venue: 'Route 66 Event Center',
+    neighborhood: 'Downtown',
+    city: 'Springfield, IL',
+    date: getUpcomingDay(6),
+    time: '11:00 AM - 8:00 PM',
+    price: 'Free entry',
+    priceNum: 0,
+    category: 'festival',
+    vibe: 'Family · Community',
+    emoji: '🍖',
+    image: null,
+    premiumOnly: false,
+    earlyAccess: false,
+    tags: ['bbq', 'festival', 'route 66', 'free', 'family'],
+    source: 'SABOR'
+  },
+  {
+    id: 'evt_il_002',
+    title: 'Taco & Cerveza Night — Rockford',
+    description: 'Rockford\'s best taquerías set up shop on Broadway. $3 tacos, $4 cervezas, and a live DJ.',
+    venue: 'Broadway District',
+    neighborhood: 'Broadway',
+    city: 'Rockford, IL',
+    date: getUpcomingDay(5),
+    time: '5:00 PM - 10:00 PM',
+    price: '$3+',
+    priceNum: 3,
+    category: 'happyhour',
+    vibe: 'Fun · Social',
+    emoji: '🌮',
+    image: null,
+    premiumOnly: false,
+    earlyAccess: false,
+    tags: ['tacos', 'beer', 'happy hour', 'social'],
+    source: 'SABOR'
+  },
+  {
+    id: 'evt_il_003',
+    title: 'Campus Eats Crawl — Champaign',
+    description: 'SABOR-guided food crawl through Campustown. Korean fried chicken, ramen, Thai, and boba. Student pricing.',
+    venue: 'Campustown',
+    neighborhood: 'Campustown',
+    city: 'Champaign, IL',
+    date: getUpcomingDay(4),
+    time: '5:00 PM - 9:00 PM',
+    price: '$20',
+    priceNum: 20,
+    category: 'happyhour',
+    vibe: 'Student · Social',
+    emoji: '🍜',
+    image: null,
+    premiumOnly: false,
+    earlyAccess: false,
+    tags: ['food crawl', 'student', 'asian', 'social'],
+    source: 'SABOR'
+  },
+];
+
+// ═══════════════════════════════════════
+// FORT WAYNE / SOUTH BEND / OTHER IN CURATED EVENTS
+// ═══════════════════════════════════════
+const IN_REGIONAL_EVENTS = [
+  {
+    id: 'evt_in_001',
+    title: 'South Side Food Tour — Fort Wayne',
+    description: 'Burmese, Mexican, and soul food within 6 blocks. Fort Wayne\'s most diverse food corridor.',
+    venue: 'South Side',
+    neighborhood: 'South Side',
+    city: 'Fort Wayne, IN',
+    date: getUpcomingDay(6),
+    time: '11:00 AM - 3:00 PM',
+    price: '$25',
+    priceNum: 25,
+    category: 'festival',
+    vibe: 'Cultural · Diverse',
+    emoji: '🌍',
+    image: null,
+    premiumOnly: false,
+    earlyAccess: true,
+    tags: ['food tour', 'diverse', 'cultural'],
+    source: 'SABOR'
+  },
+  {
+    id: 'evt_in_002',
+    title: 'Eddy Street Eats — South Bend',
+    description: 'South Bend\'s best food street comes alive. Asian, Mexican, and American — all walkable from Notre Dame.',
+    venue: 'Eddy Street Commons',
+    neighborhood: 'Eddy Street',
+    city: 'South Bend, IN',
+    date: getUpcomingDay(5),
+    time: '5:00 PM - 9:00 PM',
+    price: 'Free entry',
+    priceNum: 0,
+    category: 'happyhour',
+    vibe: 'Student · Social',
+    emoji: '☘️',
+    image: null,
+    premiumOnly: false,
+    earlyAccess: false,
+    tags: ['food crawl', 'student', 'happy hour', 'social'],
+    source: 'SABOR'
+  },
+  {
+    id: 'evt_in_003',
+    title: 'NWI Taco Fest — Gary/Hammond',
+    description: 'Northwest Indiana\'s taquería owners gather for a taco showdown. 10+ vendors, live cumbia, kids free.',
+    venue: 'Marquette Park',
+    neighborhood: 'Miller Beach',
+    city: 'Gary, IN',
+    date: getUpcomingDay(6),
+    time: '12:00 PM - 7:00 PM',
+    price: 'Free entry',
+    priceNum: 0,
+    category: 'festival',
+    vibe: 'Family · Community',
+    emoji: '🌮',
+    image: null,
+    premiumOnly: false,
+    earlyAccess: false,
+    tags: ['tacos', 'festival', 'free', 'family', 'nwi'],
+    source: 'SABOR'
+  },
+];
+
+// Merge all curated events
+const ALL_SABOR_EVENTS = [...SABOR_EVENTS, ...INDY_EVENTS, ...IL_REGIONAL_EVENTS, ...IN_REGIONAL_EVENTS];
+
 // ── TICKETMASTER API ──
 async function fetchTicketmasterEvents(city) {
   const apiKey = process.env.TICKETMASTER_API_KEY;
@@ -693,8 +934,8 @@ export default async function handler(req, res) {
     tmEvents = await fetchTicketmasterEvents(city);
   } catch (_) {}
 
-  // Curated SABOR events
-  let curatedEvents = SABOR_EVENTS.filter(e =>
+  // Curated SABOR events (all cities)
+  let curatedEvents = ALL_SABOR_EVENTS.filter(e =>
     e.city.toLowerCase().includes(city.split(',')[0].toLowerCase())
   );
 

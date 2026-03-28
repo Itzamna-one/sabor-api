@@ -26,7 +26,55 @@ const FALLBACK_RESTAURANTS = {
     { name: 'Mi Tocaya Antojería', cuisine: 'Mexican', emoji: '🔥', vibe: 'Trendy · Creative' },
     { name: 'S.K.Y.', cuisine: 'Asian Fusion', emoji: '✨', vibe: 'Upscale · Creative' },
   ],
+  indianapolis: [
+    { name: 'Tlaolli', cuisine: 'Mexican', emoji: '🌮', vibe: 'Authentic · Masa' },
+    { name: 'Beholder', cuisine: 'American', emoji: '✨', vibe: 'Upscale · Creative' },
+    { name: 'Livery', cuisine: 'Farm-to-Table', emoji: '🍷', vibe: 'Local · Seasonal' },
+  ],
+  rockford: [
+    { name: 'Los Portales', cuisine: 'Mexican', emoji: '🌮', vibe: 'Family · Authentic' },
+    { name: 'Olympic Tavern', cuisine: 'American', emoji: '🍔', vibe: 'Historic · Local' },
+    { name: 'Octane Interlounge', cuisine: 'Fusion', emoji: '🔥', vibe: 'Trendy · Creative' },
+  ],
 };
+
+// ─── City geo-coordinates for Places API bias ───
+const CITY_GEO = {
+  'chicago':        { lat: 41.8781, lng: -87.6298 },
+  'aurora':         { lat: 41.7606, lng: -88.3201 },
+  'joliet':         { lat: 41.5250, lng: -88.0817 },
+  'naperville':     { lat: 41.7508, lng: -88.1535 },
+  'elgin':          { lat: 42.0354, lng: -88.2826 },
+  'waukegan':       { lat: 42.3636, lng: -87.8448 },
+  'cicero':         { lat: 41.8456, lng: -87.7539 },
+  'berwyn':         { lat: 41.8506, lng: -87.7937 },
+  'rockford':       { lat: 42.2711, lng: -89.0940 },
+  'springfield':    { lat: 39.7817, lng: -89.6501 },
+  'champaign':      { lat: 40.1164, lng: -88.2434 },
+  'evanston':       { lat: 42.0451, lng: -87.6877 },
+  'schaumburg':     { lat: 42.0334, lng: -88.0834 },
+  'peoria':         { lat: 40.6936, lng: -89.5890 },
+  'bloomington':    { lat: 40.4842, lng: -88.9937 },
+  'decatur':        { lat: 39.8403, lng: -88.9548 },
+  'dekalb':         { lat: 41.9295, lng: -88.7503 },
+  'gary':           { lat: 41.5934, lng: -87.3464 },
+  'east chicago':   { lat: 41.6392, lng: -87.4545 },
+  'hammond':        { lat: 41.5834, lng: -87.5001 },
+  'indianapolis':   { lat: 39.7684, lng: -86.1581 },
+  'fort wayne':     { lat: 41.0793, lng: -85.1394 },
+  'south bend':     { lat: 41.6764, lng: -86.2520 },
+  'valparaiso':     { lat: 41.4731, lng: -87.0611 },
+  'evansville':     { lat: 37.9716, lng: -87.5711 },
+  'terre haute':    { lat: 39.4667, lng: -87.4139 },
+  'lafayette':      { lat: 40.4167, lng: -86.8753 },
+  'muncie':         { lat: 40.1934, lng: -85.3864 },
+  'michigan city':  { lat: 41.7075, lng: -86.8950 },
+};
+
+function getCityGeo(city) {
+  const cityKey = city.toLowerCase().split(',')[0].trim();
+  return CITY_GEO[cityKey] || CITY_GEO['chicago']; // fallback to Chicago
+}
 
 // ─── Google Places enrichment (with geo-bias) ───
 async function getPlaceDetails(name, city, apiKey) {
@@ -43,7 +91,7 @@ async function getPlaceDetails(name, city, apiKey) {
         maxResultCount: 1,
         locationBias: {
           circle: {
-            center: { latitude: 41.8781, longitude: -87.6298 },
+            center: { latitude: getCityGeo(city).lat, longitude: getCityGeo(city).lng },
             radius: 50000,
           },
         },
