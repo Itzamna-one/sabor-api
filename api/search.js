@@ -2,8 +2,9 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// Chicago neighborhood intelligence
+// Neighborhood intelligence — Illinois + Indiana
 const NEIGHBORHOOD_VIBES = {
+  // ── Chicago ──
   "Pilsen":           "murals, Mexican classics, art scene, family taquerías, trendy cafes",
   "Little Village":   "authentic Mexican, carnitas, La Villita markets, antojitos",
   "Humboldt Park":    "Puerto Rican cuisine, jibarito, pasteles, diverse eats",
@@ -26,13 +27,36 @@ const NEIGHBORHOOD_VIBES = {
   "Hyde Park":        "soul food, Japanese, campus eats, Harold's Chicken, diverse cafes",
   "West Loop":        "Randolph Row, steakhouses, Greek Town, fine dining, chef-driven spots",
   "Lakeview":         "Thai, ramen, sports bars, diverse casual dining, brunch",
+  // ── Chicago suburbs ──
+  "Cicero":           "Little Mexico of the suburbs, Cermak Road taquerías, authentic antojitos",
+  "Berwyn":           "Mexican-Czech mix, Cermak Road eats, Depot District bars",
+  "Evanston":         "upscale brunch, diverse college-town dining, Middle Eastern",
+  "Schaumburg":       "Indian, Korean, global mall dining, Golf Road corridor",
+  // ── Illinois metro ──
+  "Aurora":           "second-largest IL city, Latin main street, diverse east side",
+  "Joliet":           "historic downtown, Mexican east side, diverse corridors",
+  "Naperville":       "upscale dining, South Asian corridor, brunch scene",
+  "Elgin":            "Latino heart of the Fox Valley, downtown taquerías, McLean Blvd corridor",
+  "Waukegan":         "Mexican, Salvadoran, Latin corridor on Belvidere Rd",
+  "Rockford":         "revitalized downtown, Broadway Latino eats, East State diversity",
+  "Springfield":      "Route 66 classics, South Grand Asian strip, soul food",
+  "Champaign":        "university town, Campustown Asian eats, diverse Green Street",
+  // ── Indiana — NW Indiana (Chicagoland) ──
+  "Gary":             "soul food, BBQ, lakefront casual, Broadway Mexican",
+  "East Chicago":     "Indiana Harbor Mexican, authentic Latin corridor",
+  "Hammond":          "Mexican, Salvadoran, Calumet Ave diversity, Hessville BBQ",
+  "Valparaiso":       "charming downtown, local bistros, Route 30 diversity",
+  // ── Indiana — major metros ──
+  "Indianapolis":     "West Washington Latino heart, Fountain Square trendy, Mass Ave upscale, 38th St global",
+  "Fort Wayne":       "revitalized downtown, South Side Mexican-Burmese, Lima Road diversity",
+  "South Bend":       "west side Mexican, Eddy Street student eats, revitalized downtown",
 };
 
 // Tier radius config
 const TIER_CONFIG = {
   free:    { radius: "1mi",     label: 'cerca de ti' },
   credits: { radius: "3mi",     label: "tu zona" },
-  premium: { radius: "citywide",label: "todo Chicago" },
+  premium: { radius: "citywide",label: "toda la ciudad" },
 };
 
 // Simple in-memory cache
@@ -60,9 +84,9 @@ function setCache(key, data) {
 }
 
 
-// Chicago ZIP → Neighborhood lookup table
-const CHICAGO_NEIGHBORHOODS = {
-  // Chicago proper
+// ZIP → Neighborhood lookup table — Illinois + Indiana
+const AREA_NEIGHBORHOODS = {
+  // ── Chicago proper ──
   '60601': 'The Loop', '60602': 'The Loop', '60603': 'The Loop',
   '60604': 'The Loop', '60605': 'South Loop', '60606': 'The Loop',
   '60607': 'West Loop', '60608': 'Pilsen', '60609': 'Back of the Yards',
@@ -82,7 +106,7 @@ const CHICAGO_NEIGHBORHOODS = {
   '60653': 'Bronzeville', '60654': 'River North', '60655': 'Morgan Park',
   '60656': 'Norwood Park', '60657': 'Lakeview', '60659': 'West Ridge',
   '60660': 'Edgewater', '60661': 'West Loop', '60707': 'Elmwood Park',
-  // Suburbs - show city name
+  // ── Chicago suburbs ──
   '60402': 'Berwyn', '60304': 'Oak Park', '60301': 'Oak Park',
   '60302': 'Oak Park', '60303': 'Oak Park', '60305': 'River Forest',
   '60130': 'Forest Park', '60153': 'Maywood', '60154': 'Westchester',
@@ -104,6 +128,59 @@ const CHICAGO_NEIGHBORHOODS = {
   '60525': 'La Grange', '60526': 'La Grange Park', '60534': 'Lyons',
   '60546': 'Riverside', '60558': 'Western Springs', '60804': 'Cicero',
   '60827': 'Burnham',
+  // Evanston / North Shore
+  '60201': 'Evanston', '60202': 'Evanston', '60203': 'Evanston',
+  '60076': 'Skokie', '60077': 'Skokie',
+  // Schaumburg / NW suburbs
+  '60173': 'Schaumburg', '60194': 'Schaumburg', '60195': 'Schaumburg',
+  '60169': 'Hoffman Estates', '60008': 'Rolling Meadows',
+  // Naperville / West suburbs
+  '60540': 'Naperville', '60563': 'Naperville', '60564': 'Naperville',
+  '60565': 'Naperville', '60515': 'Downers Grove', '60516': 'Downers Grove',
+  // ── Illinois metro ──
+  // Aurora
+  '60502': 'Aurora', '60503': 'Aurora', '60504': 'Aurora', '60505': 'Aurora', '60506': 'Aurora',
+  // Joliet
+  '60431': 'Joliet', '60432': 'Joliet', '60433': 'Joliet', '60435': 'Joliet', '60436': 'Joliet',
+  // Elgin
+  '60120': 'Elgin', '60123': 'Elgin', '60124': 'Elgin',
+  // Waukegan / Lake County
+  '60085': 'Waukegan', '60087': 'Waukegan', '60064': 'North Chicago',
+  // Rockford
+  '61101': 'Rockford', '61102': 'Rockford', '61103': 'Rockford', '61104': 'Rockford', '61107': 'Rockford',
+  '61108': 'Rockford', '61109': 'Loves Park',
+  // Springfield
+  '62701': 'Springfield', '62702': 'Springfield', '62703': 'Springfield', '62704': 'Springfield',
+  // Champaign-Urbana
+  '61820': 'Champaign', '61821': 'Champaign', '61801': 'Urbana', '61802': 'Urbana',
+  // ── Indiana — NW Indiana (Chicagoland) ──
+  '46402': 'Gary', '46403': 'Gary', '46404': 'Gary', '46405': 'Gary', '46407': 'Gary', '46408': 'Gary', '46409': 'Gary',
+  '46312': 'East Chicago', '46311': 'Dyer',
+  '46320': 'Hammond', '46321': 'Hammond', '46322': 'Hammond', '46323': 'Hammond', '46324': 'Hammond', '46327': 'Hammond',
+  '46383': 'Valparaiso', '46385': 'Valparaiso',
+  '46375': 'Schererville', '46342': 'Hobart', '46307': 'Crown Point',
+  '46373': 'St. John', '46319': 'Griffith', '46341': 'Highland',
+  '46410': 'Merrillville', '46368': 'Portage',
+  // ── Indiana — major metros ──
+  // Indianapolis
+  '46201': 'Indianapolis', '46202': 'Indianapolis', '46203': 'Indianapolis',
+  '46204': 'Indianapolis', '46205': 'Indianapolis', '46208': 'Indianapolis',
+  '46214': 'Indianapolis', '46218': 'Indianapolis', '46222': 'Indianapolis',
+  '46224': 'Indianapolis', '46225': 'Indianapolis', '46226': 'Indianapolis',
+  '46227': 'Indianapolis', '46228': 'Indianapolis', '46234': 'Indianapolis',
+  '46236': 'Indianapolis', '46237': 'Indianapolis', '46239': 'Indianapolis',
+  '46240': 'Indianapolis', '46241': 'Indianapolis', '46250': 'Indianapolis',
+  '46254': 'Indianapolis', '46260': 'Indianapolis', '46268': 'Indianapolis',
+  // Fort Wayne
+  '46801': 'Fort Wayne', '46802': 'Fort Wayne', '46803': 'Fort Wayne',
+  '46804': 'Fort Wayne', '46805': 'Fort Wayne', '46806': 'Fort Wayne',
+  '46807': 'Fort Wayne', '46808': 'Fort Wayne', '46809': 'Fort Wayne',
+  '46815': 'Fort Wayne', '46816': 'Fort Wayne', '46818': 'Fort Wayne',
+  '46825': 'Fort Wayne', '46835': 'Fort Wayne',
+  // South Bend
+  '46601': 'South Bend', '46613': 'South Bend', '46614': 'South Bend',
+  '46615': 'South Bend', '46616': 'South Bend', '46617': 'South Bend',
+  '46544': 'Mishawaka', '46545': 'Mishawaka',
 };
 
 function getNeighborhood(address) {
@@ -112,14 +189,27 @@ function getNeighborhood(address) {
   const zipMatch = address.match(/\b(\d{5})\b/);
   if (zipMatch) {
     const zip = zipMatch[1];
-    if (CHICAGO_NEIGHBORHOODS[zip]) return CHICAGO_NEIGHBORHOODS[zip];
+    if (AREA_NEIGHBORHOODS[zip]) return AREA_NEIGHBORHOODS[zip];
   }
-  // Check for known suburb names in address
-  const suburbs = ['Cicero', 'Berwyn', 'Oak Lawn', 'Oak Park', 'Evanston',
+  // Check for known city/suburb names in address
+  const knownAreas = [
+    // IL suburbs
+    'Cicero', 'Berwyn', 'Oak Lawn', 'Oak Park', 'Evanston',
     'Skokie', 'Niles', 'Norridge', 'Harwood Heights', 'Elmwood Park',
-    'River Forest', 'Forest Park', 'Maywood', 'Bellwood', 'Melrose Park'];
-  for (const suburb of suburbs) {
-    if (address.includes(suburb)) return suburb;
+    'River Forest', 'Forest Park', 'Maywood', 'Bellwood', 'Melrose Park',
+    'Schaumburg', 'Naperville', 'Downers Grove', 'Hoffman Estates',
+    // IL metro
+    'Aurora', 'Joliet', 'Elgin', 'Waukegan', 'Rockford', 'Springfield',
+    'Champaign', 'Urbana', 'North Chicago',
+    // IN — NW Indiana
+    'Gary', 'East Chicago', 'Hammond', 'Valparaiso', 'Schererville',
+    'Hobart', 'Crown Point', 'Merrillville', 'Portage', 'Highland',
+    'Griffith', 'Dyer', 'St. John',
+    // IN — major
+    'Indianapolis', 'Fort Wayne', 'South Bend', 'Mishawaka',
+  ];
+  for (const area of knownAreas) {
+    if (address.includes(area)) return area;
   }
   return null;
 }
@@ -366,11 +456,16 @@ Reglas críticas:
     } catch (parseErr) {
       console.error("JSON parse failed. Raw AI response:", raw.substring(0, 500));
       // Attempt recovery: extract JSON object from response
-      const jsonMatch = clean.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        parsed = JSON.parse(jsonMatch[0]);
-      } else {
-        return res.status(500).json({ error: "AI response parse error", hint: "Response was not valid JSON" });
+      try {
+        const jsonMatch = clean.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          parsed = JSON.parse(jsonMatch[0]);
+        } else {
+          return res.status(500).json({ error: "AI response parse error", hint: "Response was not valid JSON" });
+        }
+      } catch (recoveryErr) {
+        console.error("JSON recovery also failed:", recoveryErr.message);
+        return res.status(500).json({ error: "AI response parse error", hint: "Could not extract valid JSON from response" });
       }
     }
 
