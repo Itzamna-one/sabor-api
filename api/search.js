@@ -228,14 +228,50 @@ async function _placesLookup(textQuery, geo, apiKey, city) {
   }
 
   if (!neighborhood && !realAddress) return null; // completely useless result
-  return { neighborhood, address: realAddress };
+  const displayName = place.displayName?.text || null;
+  return { neighborhood, address: realAddress, displayName };
+}
+
+// Extract cuisine keyword from a result's name/description for fallback searches
+function extractCuisine(result) {
+  const text = `${result.name || ''} ${result.description || ''}`.toLowerCase();
+  const cuisineMap = [
+    [/\b(thai|pad thai|pad see ew|tom yum|green curry|sticky rice)\b/, 'Thai'],
+    [/\b(mexican|taco|burrito|birria|pozole|tamale|elote|enchilada|quesadilla|torta|al pastor)\b/, 'Mexican'],
+    [/\b(korean|bibimbap|bulgogi|kimchi|korean bbq)\b/, 'Korean'],
+    [/\b(japanese|sushi|ramen|udon|tempura|izakaya)\b/, 'Japanese'],
+    [/\b(chinese|dim sum|dumpling|wonton|szechuan|sichuan|cantonese|lo mein|fried rice)\b/, 'Chinese'],
+    [/\b(italian|pizza|pasta|risotto|gelato|trattoria)\b/, 'Italian'],
+    [/\b(indian|curry|tikka|naan|biryani|tandoori|masala)\b/, 'Indian'],
+    [/\b(ethiopian|injera|wat|kitfo)\b/, 'Ethiopian'],
+    [/\b(vietnamese|pho|banh mi|bun)\b/, 'Vietnamese'],
+    [/\b(soul food|fried chicken|catfish|mac and cheese|collard|cornbread)\b/, 'soul food'],
+    [/\b(bbq|brisket|ribs|smoked|barbecue|pulled pork)\b/, 'BBQ'],
+    [/\b(mediterranean|falafel|shawarma|hummus|gyro|kebab)\b/, 'Mediterranean'],
+    [/\b(colombian|arepa|bandeja|empanada colombiana)\b/, 'Colombian'],
+    [/\b(puerto rican|jibarito|mofongo|pasteles)\b/, 'Puerto Rican'],
+    [/\b(salvadoran|pupusa)\b/, 'Salvadoran'],
+    [/\b(peruvian|ceviche|lomo saltado)\b/, 'Peruvian'],
+    [/\b(breakfast|brunch|pancake|waffle|egg|coffee|café|cafe|latte|cortado)\b/, 'breakfast'],
+    [/\b(seafood|fish|shrimp|lobster|crab|oyster|mariscos)\b/, 'seafood'],
+    [/\b(burger|sandwich|deli|sub)\b/, 'burger'],
+    [/\b(dessert|ice cream|churro|pastry|cake|bakery|dulce)\b/, 'dessert'],
+  ];
+  for (const [regex, cuisine] of cuisineMap) {
+    if (regex.test(text)) return cuisine;
+  }
+  return 'restaurant'; // generic fallback
 }
 
 // Verify all results in parallel — replace AI's guessed neighborhoods with Google's real data
+// If name lookup fails (hallucinated name), falls back to cuisine+area search
 async function verifyNeighborhoods(results, city) {
   if (!results || results.length === 0) return results;
+  const apiKey = process.env.GOOGLE_PLACES_KEY;
+  const geo = getSearchGeo(city);
 
   const promises = results.map(async (r) => {
+    // Step 1: Try name lookup (works for real restaurant names)
     const realData = await lookupRealNeighborhood(r.name, city);
     if (realData) {
       if (realData.neighborhood) {
@@ -243,15 +279,40 @@ async function verifyNeighborhoods(results, city) {
           console.log(`🏘️ Neighborhood corrected: "${r.neighborhood}" → "${realData.neighborhood}" for ${r.name}`);
         }
         r.neighborhood = realData.neighborhood;
-      } else {
-        console.log(`🏘️ No neighborhood found for "${r.name}" — keeping AI's "${r.neighborhood}"`);
       }
       if (realData.address) {
-        r.address = realData.address; // replace AI's hallucinated address with Google's real one
+        r.address = realData.address;
       }
-    } else {
-      console.log(`🏘️ Places lookup returned null for "${r.name}" — AI neighborhood "${r.neighborhood}" unchanged`);
+      return r;
     }
+
+    // Step 2: Name not found (likely hallucinated) — fallback to cuisine+area search
+    // Search for a REAL restaurant of the same cuisine type in the AI's claimed area
+    if (apiKey) {
+      const cuisine = extractCuisine(r);
+      const aiHood = r.neighborhood || '';
+      const fallbackQuery = `${cuisine} restaurant ${aiHood} ${city}`.trim();
+      console.log(`🏘️ Name lookup failed for "${r.name}" — trying fallback: "${fallbackQuery}"`);
+
+      const fallback = await _placesLookup(fallbackQuery, geo, apiKey, city);
+      if (fallback) {
+        const oldName = r.name;
+        // Replace name with real restaurant found by Google (keeps cuisine match)
+        if (fallback.displayName) {
+          r.name = `${fallback.displayName}${fallback.neighborhood ? ' — ' + fallback.neighborhood : ''}`;
+        }
+        if (fallback.neighborhood) {
+          r.neighborhood = fallback.neighborhood;
+        }
+        if (fallback.address) {
+          r.address = fallback.address;
+        }
+        console.log(`🏘️ Replaced hallucinated "${oldName}" → real "${r.name}" (${r.neighborhood})`);
+        return r;
+      }
+    }
+
+    console.log(`🏘️ All lookups failed for "${r.name}" — keeping AI data`);
     return r;
   });
 
@@ -443,9 +504,18 @@ Critical rules:
 - ${rotationNote || "Vary the restaurants"}
 - Respect radius ${tierConfig.radius}
 - ${isPremium ? "Can recommend from any neighborhood in Chicago" : `Stay within ${tierConfig.radius} of the user`}
-- Real authentic restaurants in ${city} — must actually exist at the address you provide
-- NEIGHBORHOOD ACCURACY: The "neighborhood" field MUST match where the restaurant physically is based on its street address. Do NOT guess — use the address. A spot on W 18th St between Halsted and Western is Pilsen. A spot on W Cermak near Wentworth is Chinatown. A spot on N Milwaukee near California is Logan Square. Diversey Ave near Western is Bucktown/Logan Square, NOT Chinatown. W Superior near Halsted is River West/West Town, NOT Little Village. If unsure, use the broader area (e.g. "West Side") rather than guessing wrong.
-- The "address" field MUST be a real street address with ZIP code. Do NOT invent addresses.${isStreetFood ? '\n- STREET FOOD ONLY: Every result must be a mobile vendor, cart, truck, or informal stand. If it has indoor seating and a permanent address, it is a RESTAURANT — do not include it.' : ''}
+- REAL RESTAURANTS ONLY: Every restaurant you name MUST be a real, established business that exists on Google Maps RIGHT NOW. Do NOT invent creative names like "Elote Cart on Cermak" or "Night Taco Truck on Archer" — these are made up. Use the restaurant's ACTUAL business name as it appears on Google Maps or Yelp (e.g. "Taquería Los Comales", "Joy Yee's Noodles", "Avec"). If you are not 95% certain a restaurant exists with that exact name, pick a well-known restaurant you ARE certain about instead.
+- NEIGHBORHOOD ACCURACY: The "neighborhood" field MUST match the restaurant's REAL physical location. Chicago neighborhood boundaries:
+  • Chinatown = Wentworth Ave corridor, roughly Cermak (22nd) to 26th St. ONLY restaurants ON or NEAR Wentworth/Archer between 22nd-26th are Chinatown.
+  • Pilsen = 16th-22nd St, Halsted to Western (murals, Mexican classics)
+  • Little Village = 26th St corridor, California to Kostner (La Villita)
+  • West Town / Ukrainian Village = Chicago Ave to Division, Ashland to Western
+  • Logan Square = Milwaukee Ave corridor near California/Kedzie
+  • Wicker Park = Milwaukee/North/Damen triangle
+  • Bridgeport = 31st-35th St, Halsted to Ashland (south of Sox park)
+  • Lakeview = Belmont to Irving Park, lakefront to Ravenswood
+  A restaurant on W Chicago Ave is West Town, NOT Chinatown. A restaurant on N Halsted near Belmont is Lakeview, NOT Chinatown. Do NOT cluster all results in one famous neighborhood.
+- The "address" field MUST be the restaurant's REAL street address with ZIP code — the same address that appears on Google Maps. Do NOT invent or approximate addresses.${isStreetFood ? '\n- STREET FOOD ONLY: Every result must be a mobile vendor, cart, truck, or informal stand. If it has indoor seating and a permanent address, it is a RESTAURANT — do not include it.' : ''}
 - SPREAD restaurants across DIFFERENT neighborhoods — do NOT put all results in the same neighborhood unless the user specifically asked for one area
 - Never repeat the same 3 spots
 - Write descriptions with FLAVOR — no bland generic sentences like "great atmosphere" or "worth a visit". Name specific dishes, textures, flavors.${conSabor ? '\n- CON SABOR: Every description MUST include a Latin cultural bridge — a comparison, pairing suggestion, or flavor connection to Latin cuisine.' : ''}`
@@ -483,9 +553,18 @@ Reglas críticas:
 - ${rotationNote || "Varía los restaurantes"}
 - Respeta radio ${tierConfig.radius}
 - ${isPremium ? "Puedes recomendar de cualquier barrio de " + city : `Mantente dentro de ${tierConfig.radius} del usuario`}
-- Restaurantes reales y auténticos de ${city} — deben existir realmente en la dirección que proporcionas
-- PRECISIÓN DE BARRIO: El campo "neighborhood" DEBE coincidir con donde el restaurante está físicamente SEGÚN SU DIRECCIÓN. NO adivines. Un spot en W 18th St entre Halsted y Western es Pilsen. Un spot en W Cermak cerca de Wentworth es Chinatown. Diversey cerca de Western es Bucktown/Logan Square, NO Chinatown. W Superior cerca de Halsted es River West/West Town, NO Little Village. Si no estás seguro, usa el área general (ej: "West Side").
-- El campo "address" DEBE ser una dirección real con código postal. NO inventes direcciones.${isStreetFood ? '\n- SOLO COMIDA CALLEJERA: Cada resultado debe ser un vendedor móvil, carrito, troca o puesto informal. Si tiene asientos adentro y dirección permanente, es un RESTAURANTE — no lo incluyas.' : ''}
+- SOLO RESTAURANTES REALES: Cada restaurante DEBE ser un negocio real que existe en Google Maps AHORA MISMO. NO inventes nombres creativos como "Carrito de Elote en Cermak" o "Taco Truck Nocturno en Archer" — esos no existen. Usa el NOMBRE REAL del negocio como aparece en Google Maps o Yelp (ej: "Taquería Los Comales", "Joy Yee's Noodles", "Avec"). Si no estás 95% seguro de que el restaurante existe con ese nombre exacto, elige uno conocido del que SÍ estés seguro.
+- PRECISIÓN DE BARRIO: El campo "neighborhood" DEBE coincidir con la ubicación REAL del restaurante. Límites de barrios en Chicago:
+  • Chinatown = corredor Wentworth Ave, aprox. Cermak (22nd) a 26th St. SOLO restaurantes EN o CERCA de Wentworth/Archer entre 22nd-26th son Chinatown.
+  • Pilsen = 16th-22nd St, Halsted a Western (murales, clásicos mexicanos)
+  • Little Village = corredor 26th St, California a Kostner (La Villita)
+  • West Town / Ukrainian Village = Chicago Ave a Division, Ashland a Western
+  • Logan Square = corredor Milwaukee Ave cerca de California/Kedzie
+  • Wicker Park = triángulo Milwaukee/North/Damen
+  • Bridgeport = 31st-35th St, Halsted a Ashland (sur del Sox park)
+  • Lakeview = Belmont a Irving Park, lakefront a Ravenswood
+  Un restaurante en W Chicago Ave es West Town, NO Chinatown. Uno en N Halsted cerca de Belmont es Lakeview, NO Chinatown. NO agrupes todos en un solo barrio famoso.
+- El campo "address" DEBE ser la dirección REAL del restaurante con ZIP — la misma que aparece en Google Maps. NO inventes ni aproximes direcciones.${isStreetFood ? '\n- SOLO COMIDA CALLEJERA: Cada resultado debe ser un vendedor móvil, carrito, troca o puesto informal. Si tiene asientos adentro y dirección permanente, es un RESTAURANTE — no lo incluyas.' : ''}
 - DISTRIBUYE restaurantes en DIFERENTES barrios — NO pongas todos en el mismo barrio a menos que el usuario pida uno específico
 - Nunca repitas los mismos 3 spots
 - Escribe descripciones con SABOR — nada de frases genéricas como "gran ambiente" o "vale la pena". Nombra platillos, texturas, sabores específicos.${conSabor ? '\n- CON SABOR: Cada descripción DEBE incluir un puente cultural latino — una comparación, sugerencia de complemento, o conexión de sabores con la cocina latina.' : ''}`,
