@@ -1,16 +1,16 @@
 // api/events.js — Dynamic events with upcoming dates
 
-// Dynamic dates helper — includes today if the day matches
+// Dynamic dates helper — always returns "DayName, Month Date" format
+// "Today" label is added CLIENT-SIDE where DateTime.now() is in the correct timezone.
+// Vercel runs in UTC which causes wrong "Today" labels at night in US timezones.
 function getUpcomingDay(targetDay, weeksAhead = 0) {
   const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const today = new Date();
   let daysUntil = (targetDay - today.getDay() + 7) % 7;
-  // daysUntil === 0 means today IS the target day — show it today, not next week
   const d = new Date(today);
   d.setDate(today.getDate() + daysUntil + (weeksAhead * 7));
-  const isToday = daysUntil === 0 && weeksAhead === 0;
-  return isToday ? `Today, ${months[d.getMonth()]} ${d.getDate()}` : `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+  return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
 }
 
 // Helper: get today's day number (0=Sun, 1=Mon, ... 6=Sat)
@@ -874,14 +874,11 @@ async function fetchTicketmasterEvents(city) {
       const priceStr = priceMin ? (priceMax && priceMax !== priceMin ? `$${priceMin} - $${priceMax}` : `$${priceMin}`) : 'See event';
       const img = e.images?.find(img => img.width >= 300)?.url || null;
 
-      // Format date nicely
+      // Format date — always "DayName, Month Date" (client adds "Today" label locally)
       const eventDate = new Date(startLocal + 'T' + (startTime || '00:00:00'));
-      const isToday = startLocal === today.toISOString().split('T')[0];
       const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
       const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-      const dateStr = isToday
-        ? `Today, ${months[eventDate.getMonth()]} ${eventDate.getDate()}`
-        : `${days[eventDate.getDay()]}, ${months[eventDate.getMonth()]} ${eventDate.getDate()}`;
+      const dateStr = `${days[eventDate.getDay()]}, ${months[eventDate.getMonth()]} ${eventDate.getDate()}`;
 
       // Format time
       let timeStr = '';
@@ -957,12 +954,20 @@ export default async function handler(req, res) {
     }
   }
 
-  // Sort: today first, then live events, then by date
-  const todayStr = 'Today,';
+  // Sort chronologically, then live events before curated within same date
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  function parseDateStr(dateStr) {
+    // Parse "DayName, MonthName Date" → comparable value
+    const match = dateStr?.match(/(\w+)\s+(\d+)$/);
+    if (!match) return 99999;
+    const monthIdx = months.indexOf(match[1]);
+    const day = parseInt(match[2]);
+    return monthIdx * 100 + day;
+  }
   allEvents.sort((a, b) => {
-    const aToday = a.date.startsWith(todayStr) ? 0 : 1;
-    const bToday = b.date.startsWith(todayStr) ? 0 : 1;
-    if (aToday !== bToday) return aToday - bToday;
+    const dateA = parseDateStr(a.date);
+    const dateB = parseDateStr(b.date);
+    if (dateA !== dateB) return dateA - dateB;
     // Live events before curated within same date
     const aLive = a.source === 'Ticketmaster' ? 0 : 1;
     const bLive = b.source === 'Ticketmaster' ? 0 : 1;

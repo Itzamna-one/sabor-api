@@ -84,134 +84,178 @@ function setCache(key, data) {
 }
 
 
-// ZIP → Neighborhood lookup table — Illinois + Indiana
-const AREA_NEIGHBORHOODS = {
-  // ── Chicago proper ──
-  '60601': 'The Loop', '60602': 'The Loop', '60603': 'The Loop',
-  '60604': 'The Loop', '60605': 'South Loop', '60606': 'The Loop',
-  '60607': 'West Loop', '60608': 'Pilsen', '60609': 'Back of the Yards',
-  '60610': 'Near North Side', '60611': 'Streeterville', '60612': 'East Garfield Park',
-  '60613': 'Lakeview', '60614': 'Lincoln Park', '60615': 'Woodlawn',
-  '60616': 'Chinatown', '60617': 'South Chicago', '60618': 'Avondale',
-  '60619': 'Chatham', '60620': 'Auburn Gresham', '60621': 'Englewood',
-  '60622': 'Wicker Park', '60623': 'Little Village', '60624': 'Humboldt Park',
-  '60625': 'Albany Park', '60626': 'Rogers Park', '60628': 'Roseland',
-  '60629': 'Gage Park', '60630': 'Jefferson Park', '60631': 'Norwood Park',
-  '60632': 'Back of the Yards', '60633': 'Hegewisch', '60634': 'Dunning',
-  '60636': 'West Englewood', '60637': 'Hyde Park', '60638': 'Garfield Ridge',
-  '60639': 'Belmont Cragin', '60640': 'Uptown', '60641': 'Hermosa',
-  '60642': 'Noble Square', '60643': 'Beverly', '60644': 'Austin',
-  '60645': 'West Ridge', '60646': 'Norwood Park', '60647': 'Logan Square',
-  '60649': 'South Shore', '60651': 'Humboldt Park', '60652': 'Ashburn',
-  '60653': 'Bronzeville', '60654': 'River North', '60655': 'Morgan Park',
-  '60656': 'Norwood Park', '60657': 'Lakeview', '60659': 'West Ridge',
-  '60660': 'Edgewater', '60661': 'West Loop', '60707': 'Elmwood Park',
-  // ── Chicago suburbs ──
-  '60402': 'Berwyn', '60304': 'Oak Park', '60301': 'Oak Park',
-  '60302': 'Oak Park', '60303': 'Oak Park', '60305': 'River Forest',
-  '60130': 'Forest Park', '60153': 'Maywood', '60154': 'Westchester',
-  '60155': 'Broadview', '60160': 'Melrose Park', '60163': 'Berkeley',
-  '60164': 'Melrose Park', '60165': 'Stone Park', '60171': 'River Grove',
-  '60176': 'Schiller Park', '60406': 'Blue Island', '60409': 'Calumet City',
-  '60411': 'Chicago Heights', '60415': 'Chicago Ridge', '60419': 'Dolton',
-  '60422': 'Flossmoor', '60425': 'Glenwood', '60426': 'Harvey',
-  '60429': 'Hazel Crest', '60430': 'Homewood', '60438': 'Lansing',
-  '60443': 'Matteson', '60445': 'Midlothian', '60452': 'Oak Forest',
-  '60453': 'Oak Lawn', '60455': 'Bridgeview', '60456': 'Hometown',
-  '60457': 'Hickory Hills', '60458': 'Justice', '60459': 'Burbank',
-  '60461': 'Olympia Fields', '60462': 'Orland Park', '60463': 'Palos Heights',
-  '60464': 'Palos Park', '60465': 'Palos Hills', '60466': 'Park Forest',
-  '60469': 'Posen', '60471': 'Richton Park', '60472': 'Robbins',
-  '60473': 'South Holland', '60475': 'Steger', '60476': 'Thornton',
-  '60477': 'Tinley Park', '60478': 'Country Club Hills', '60480': 'Willow Springs',
-  '60482': 'Worth', '60501': 'Summit', '60513': 'Brookfield',
-  '60525': 'La Grange', '60526': 'La Grange Park', '60534': 'Lyons',
-  '60546': 'Riverside', '60558': 'Western Springs', '60804': 'Cicero',
-  '60827': 'Burnham',
-  // Evanston / North Shore
-  '60201': 'Evanston', '60202': 'Evanston', '60203': 'Evanston',
-  '60076': 'Skokie', '60077': 'Skokie',
-  // Schaumburg / NW suburbs
-  '60173': 'Schaumburg', '60194': 'Schaumburg', '60195': 'Schaumburg',
-  '60169': 'Hoffman Estates', '60008': 'Rolling Meadows',
-  // Naperville / West suburbs
-  '60540': 'Naperville', '60563': 'Naperville', '60564': 'Naperville',
-  '60565': 'Naperville', '60515': 'Downers Grove', '60516': 'Downers Grove',
-  // ── Illinois metro ──
-  // Aurora
-  '60502': 'Aurora', '60503': 'Aurora', '60504': 'Aurora', '60505': 'Aurora', '60506': 'Aurora',
-  // Joliet
-  '60431': 'Joliet', '60432': 'Joliet', '60433': 'Joliet', '60435': 'Joliet', '60436': 'Joliet',
-  // Elgin
-  '60120': 'Elgin', '60123': 'Elgin', '60124': 'Elgin',
-  // Waukegan / Lake County
-  '60085': 'Waukegan', '60087': 'Waukegan', '60064': 'North Chicago',
-  // Rockford
-  '61101': 'Rockford', '61102': 'Rockford', '61103': 'Rockford', '61104': 'Rockford', '61107': 'Rockford',
-  '61108': 'Rockford', '61109': 'Loves Park',
-  // Springfield
-  '62701': 'Springfield', '62702': 'Springfield', '62703': 'Springfield', '62704': 'Springfield',
-  // Champaign-Urbana
-  '61820': 'Champaign', '61821': 'Champaign', '61801': 'Urbana', '61802': 'Urbana',
-  // ── Indiana — NW Indiana (Chicagoland) ──
-  '46402': 'Gary', '46403': 'Gary', '46404': 'Gary', '46405': 'Gary', '46407': 'Gary', '46408': 'Gary', '46409': 'Gary',
-  '46312': 'East Chicago', '46311': 'Dyer',
-  '46320': 'Hammond', '46321': 'Hammond', '46322': 'Hammond', '46323': 'Hammond', '46324': 'Hammond', '46327': 'Hammond',
-  '46383': 'Valparaiso', '46385': 'Valparaiso',
-  '46375': 'Schererville', '46342': 'Hobart', '46307': 'Crown Point',
-  '46373': 'St. John', '46319': 'Griffith', '46341': 'Highland',
-  '46410': 'Merrillville', '46368': 'Portage',
-  // ── Indiana — major metros ──
-  // Indianapolis
-  '46201': 'Indianapolis', '46202': 'Indianapolis', '46203': 'Indianapolis',
-  '46204': 'Indianapolis', '46205': 'Indianapolis', '46208': 'Indianapolis',
-  '46214': 'Indianapolis', '46218': 'Indianapolis', '46222': 'Indianapolis',
-  '46224': 'Indianapolis', '46225': 'Indianapolis', '46226': 'Indianapolis',
-  '46227': 'Indianapolis', '46228': 'Indianapolis', '46234': 'Indianapolis',
-  '46236': 'Indianapolis', '46237': 'Indianapolis', '46239': 'Indianapolis',
-  '46240': 'Indianapolis', '46241': 'Indianapolis', '46250': 'Indianapolis',
-  '46254': 'Indianapolis', '46260': 'Indianapolis', '46268': 'Indianapolis',
-  // Fort Wayne
-  '46801': 'Fort Wayne', '46802': 'Fort Wayne', '46803': 'Fort Wayne',
-  '46804': 'Fort Wayne', '46805': 'Fort Wayne', '46806': 'Fort Wayne',
-  '46807': 'Fort Wayne', '46808': 'Fort Wayne', '46809': 'Fort Wayne',
-  '46815': 'Fort Wayne', '46816': 'Fort Wayne', '46818': 'Fort Wayne',
-  '46825': 'Fort Wayne', '46835': 'Fort Wayne',
-  // South Bend
-  '46601': 'South Bend', '46613': 'South Bend', '46614': 'South Bend',
-  '46615': 'South Bend', '46616': 'South Bend', '46617': 'South Bend',
-  '46544': 'Mishawaka', '46545': 'Mishawaka',
+// ── Google Places name-based neighborhood verification ──
+// The AI hallucinates addresses. Geocoding a fake address gives a fake neighborhood.
+// Instead: look up the restaurant NAME in Google Places → get the REAL address + neighborhood.
+// Same approach as places-enrich.js but focused on neighborhood correction.
+const placeCache = new Map();
+const PLACE_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+// Geo-bias centers for Google Places lookups (matches home-feed.js + places-enrich.js)
+const CITY_GEO = {
+  'chicago':        { lat: 41.8781, lng: -87.6298 },
+  'aurora':         { lat: 41.7606, lng: -88.3201 },
+  'joliet':         { lat: 41.5250, lng: -88.0817 },
+  'naperville':     { lat: 41.7508, lng: -88.1535 },
+  'elgin':          { lat: 42.0354, lng: -88.2826 },
+  'waukegan':       { lat: 42.3636, lng: -87.8448 },
+  'cicero':         { lat: 41.8456, lng: -87.7539 },
+  'berwyn':         { lat: 41.8506, lng: -87.7937 },
+  'rockford':       { lat: 42.2711, lng: -89.0940 },
+  'springfield':    { lat: 39.7817, lng: -89.6501 },
+  'champaign':      { lat: 40.1164, lng: -88.2434 },
+  'evanston':       { lat: 42.0451, lng: -87.6877 },
+  'schaumburg':     { lat: 42.0334, lng: -88.0834 },
+  'peoria':         { lat: 40.6936, lng: -89.5890 },
+  'bloomington':    { lat: 40.4842, lng: -88.9937 },
+  'decatur':        { lat: 39.8403, lng: -88.9548 },
+  'dekalb':         { lat: 41.9295, lng: -88.7503 },
+  'gary':           { lat: 41.5934, lng: -87.3464 },
+  'east chicago':   { lat: 41.6392, lng: -87.4545 },
+  'hammond':        { lat: 41.5834, lng: -87.5001 },
+  'indianapolis':   { lat: 39.7684, lng: -86.1581 },
+  'fort wayne':     { lat: 41.0793, lng: -85.1394 },
+  'south bend':     { lat: 41.6764, lng: -86.2520 },
+  'valparaiso':     { lat: 41.4731, lng: -87.0611 },
+  'evansville':     { lat: 37.9716, lng: -87.5711 },
+  'terre haute':    { lat: 39.4667, lng: -87.4139 },
+  'lafayette':      { lat: 40.4167, lng: -86.8753 },
+  'muncie':         { lat: 40.1934, lng: -85.3864 },
+  'michigan city':  { lat: 41.7075, lng: -86.8950 },
 };
 
-function getNeighborhood(address) {
-  if (!address) return null;
-  // Extract ZIP code from address
-  const zipMatch = address.match(/\b(\d{5})\b/);
-  if (zipMatch) {
-    const zip = zipMatch[1];
-    if (AREA_NEIGHBORHOODS[zip]) return AREA_NEIGHBORHOODS[zip];
+function getSearchGeo(city) {
+  const key = city.toLowerCase().split(',')[0].trim();
+  return CITY_GEO[key] || CITY_GEO['chicago'];
+}
+
+// Detect street food / carts / trucks — these shouldn't have "restaurant" appended
+const STREET_FOOD_KEYWORDS = /\b(cart|truck|stand|vendor|paletero|elotero|tamale|tamal|street food|food truck|pop-?up|market|mercado|feria|tianguis|puesto)\b/i;
+
+async function lookupRealNeighborhood(name, city) {
+  if (!name) return null;
+
+  const cacheKey = `${name}|${city}`.toLowerCase();
+  const cached = placeCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < PLACE_CACHE_TTL) return cached.data;
+
+  const apiKey = process.env.GOOGLE_PLACES_KEY;
+  if (!apiKey) return null;
+
+  try {
+    // Strip "— Neighborhood" suffix from name if present (AI often adds it)
+    const cleanName = name.replace(/\s*[—–-]\s*[A-Z][a-zA-Z\s]+$/, '').trim();
+    const isStreet = STREET_FOOD_KEYWORDS.test(cleanName);
+    const geo = getSearchGeo(city);
+
+    // Try 1: search with appropriate suffix
+    const suffix = isStreet ? '' : ' restaurant';
+    let result = await _placesLookup(`${cleanName}${suffix} ${city}`, geo, apiKey, city);
+
+    // Try 2: if no result, retry without suffix (catches non-standard business names)
+    if (!result && !isStreet) {
+      result = await _placesLookup(`${cleanName} ${city}`, geo, apiKey, city);
+    }
+
+    // Try 3: if still nothing, try just the name + "food" + city (broadest search)
+    if (!result) {
+      result = await _placesLookup(`${cleanName} food ${city}`, geo, apiKey, city);
+    }
+
+    placeCache.set(cacheKey, { data: result, ts: Date.now() });
+    if (placeCache.size > 500) {
+      const oldest = placeCache.keys().next().value;
+      placeCache.delete(oldest);
+    }
+    return result;
+  } catch (err) {
+    console.error(`Places lookup failed for "${name}":`, err.message);
+    return null;
   }
-  // Check for known city/suburb names in address
-  const knownAreas = [
-    // IL suburbs
-    'Cicero', 'Berwyn', 'Oak Lawn', 'Oak Park', 'Evanston',
-    'Skokie', 'Niles', 'Norridge', 'Harwood Heights', 'Elmwood Park',
-    'River Forest', 'Forest Park', 'Maywood', 'Bellwood', 'Melrose Park',
-    'Schaumburg', 'Naperville', 'Downers Grove', 'Hoffman Estates',
-    // IL metro
-    'Aurora', 'Joliet', 'Elgin', 'Waukegan', 'Rockford', 'Springfield',
-    'Champaign', 'Urbana', 'North Chicago',
-    // IN — NW Indiana
-    'Gary', 'East Chicago', 'Hammond', 'Valparaiso', 'Schererville',
-    'Hobart', 'Crown Point', 'Merrillville', 'Portage', 'Highland',
-    'Griffith', 'Dyer', 'St. John',
-    // IN — major
-    'Indianapolis', 'Fort Wayne', 'South Bend', 'Mishawaka',
-  ];
-  for (const area of knownAreas) {
-    if (address.includes(area)) return area;
+}
+
+// Core Google Places Text Search call — extracted for retry logic
+async function _placesLookup(textQuery, geo, apiKey, city) {
+  const resp = await fetch('https://places.googleapis.com/v1/places:searchText', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': 'places.formattedAddress,places.addressComponents,places.displayName',
+    },
+    body: JSON.stringify({
+      textQuery,
+      maxResultCount: 1,
+      locationBias: {
+        circle: {
+          center: { latitude: geo.lat, longitude: geo.lng },
+          radius: 80000,
+        },
+      },
+    }),
+  });
+
+  if (!resp.ok) return null;
+  const data = await resp.json();
+  const place = data.places?.[0];
+  if (!place) return null;
+
+  // Extract neighborhood from addressComponents
+  let neighborhood = null;
+  let realAddress = place.formattedAddress || null;
+  const cityBase = city.toLowerCase().split(',')[0].trim();
+  if (place.addressComponents) {
+    const hoodComp = place.addressComponents.find(c =>
+      c.types?.includes('neighborhood') || c.types?.includes('sublocality') || c.types?.includes('sublocality_level_1'));
+    const localityComp = place.addressComponents.find(c => c.types?.includes('locality'));
+    const locality = localityComp?.longText || null;
+    // For major cities: use neighborhood component
+    // For suburbs/smaller cities: use locality (city name)
+    neighborhood = hoodComp?.longText || (locality && locality.toLowerCase() !== cityBase ? locality : null);
   }
-  return null;
+
+  // Fallback: if no neighborhood from addressComponents, try to extract from formatted address
+  // e.g. "1234 W Diversey Ave, Chicago, IL 60614" — can at least confirm the city
+  if (!neighborhood && realAddress) {
+    // Check if address is in a known neighborhood area via NEIGHBORHOOD_VIBES keys
+    const addrLower = realAddress.toLowerCase();
+    for (const hood of Object.keys(NEIGHBORHOOD_VIBES)) {
+      if (addrLower.includes(hood.toLowerCase())) {
+        neighborhood = hood;
+        break;
+      }
+    }
+  }
+
+  if (!neighborhood && !realAddress) return null; // completely useless result
+  return { neighborhood, address: realAddress };
+}
+
+// Verify all results in parallel — replace AI's guessed neighborhoods with Google's real data
+async function verifyNeighborhoods(results, city) {
+  if (!results || results.length === 0) return results;
+
+  const promises = results.map(async (r) => {
+    const realData = await lookupRealNeighborhood(r.name, city);
+    if (realData) {
+      if (realData.neighborhood) {
+        if (realData.neighborhood !== r.neighborhood) {
+          console.log(`🏘️ Neighborhood corrected: "${r.neighborhood}" → "${realData.neighborhood}" for ${r.name}`);
+        }
+        r.neighborhood = realData.neighborhood;
+      } else {
+        console.log(`🏘️ No neighborhood found for "${r.name}" — keeping AI's "${r.neighborhood}"`);
+      }
+      if (realData.address) {
+        r.address = realData.address; // replace AI's hallucinated address with Google's real one
+      }
+    } else {
+      console.log(`🏘️ Places lookup returned null for "${r.name}" — AI neighborhood "${r.neighborhood}" unchanged`);
+    }
+    return r;
+  });
+
+  return Promise.all(promises);
 }
 
 export default async function handler(req, res) {
@@ -290,19 +334,19 @@ export default async function handler(req, res) {
   let planStops = 4;
   if (isPlanQuery) {
     if (currentHour >= 20) {        // 8pm+: late night only
-      timeContext = 'It\'s late evening. Plan a late-night food run: 1-2 stops — a dinner spot and/or a late-night snack (taquerias, diners, dessert bars that are open late). Skip breakfast/lunch/afternoon — the day is almost over.';
+      timeContext = `CURRENT TIME: ${currentHour}:00 (late evening). The user is planning NOW at night. ONLY plan dinner and/or late-night food — 1-2 stops maximum. DO NOT suggest breakfast, morning coffee, brunch, or lunch — those are IMPOSSIBLE at this hour. Use meal labels like "Dinner" or "Late Night", never "Morning" or "Lunch".`;
       planStops = 2;
     } else if (currentHour >= 17) { // 5-8pm: dinner + dessert
-      timeContext = 'It\'s evening now. Start the plan with dinner — skip breakfast and lunch (it\'s too late for those). Plan dinner + a dessert or after-dinner drink spot. 2-3 stops max.';
+      timeContext = `CURRENT TIME: ${currentHour}:00 (evening). Plan dinner + dessert/drinks — 2-3 stops. DO NOT suggest breakfast or lunch — those are past. Use labels like "Dinner", "Dessert", "After-Dinner Drinks".`;
       planStops = 3;
     } else if (currentHour >= 14) { // 2-5pm: afternoon snack + dinner
-      timeContext = 'It\'s mid-afternoon. Skip breakfast and lunch (too late). Start with an afternoon coffee or snack, then plan dinner. 2-3 stops.';
+      timeContext = `CURRENT TIME: ${currentHour}:00 (mid-afternoon). Skip breakfast and lunch (too late). Start with an afternoon coffee or snack, then plan dinner. 2-3 stops. Use labels like "Afternoon Snack", "Dinner".`;
       planStops = 3;
     } else if (currentHour >= 11) { // 11am-2pm: lunch onward
-      timeContext = 'It\'s around lunchtime. Skip breakfast (too late). Start with lunch, then afternoon snack, then dinner. 3 stops.';
+      timeContext = `CURRENT TIME: ${currentHour}:00 (around lunchtime). Skip breakfast (too late). Start with lunch, then afternoon snack, then dinner. 3 stops.`;
       planStops = 3;
     } else {                         // Before 11am: full day
-      timeContext = 'It\'s morning — plan the full day: breakfast/coffee, lunch, afternoon snack, and dinner. 4 stops.';
+      timeContext = `CURRENT TIME: ${currentHour}:00 (morning). Plan the full day: breakfast/coffee, lunch, afternoon snack, and dinner. 4 stops.`;
       planStops = 4;
     }
   }
@@ -395,13 +439,14 @@ Respond ONLY with valid JSON — no markdown, no backticks:
 }
 
 Critical rules:
-- Exactly ${isPlanQuery ? String(planStops) : (tier === 'premium' ? '6' : '3')} unique results
+- Exactly ${isPlanQuery ? String(planStops) : (tier === 'premium' ? '6' : '3')} unique results${isPlanQuery ? `\n- TIME IS ${currentHour}:00 — ONLY use meal labels appropriate for this hour. After 5pm: "Dinner", "Late Night", "Dessert", "Drinks". NEVER use "Morning", "Breakfast", "Brunch", or "Lunch" after 5pm. NEVER use "Dinner" or "Late Night" before noon.` : ''}
 - ${rotationNote || "Vary the restaurants"}
 - Respect radius ${tierConfig.radius}
 - ${isPremium ? "Can recommend from any neighborhood in Chicago" : `Stay within ${tierConfig.radius} of the user`}
-- Real authentic restaurants in Chicago — must actually exist at the address you provide
-- NEIGHBORHOOD ACCURACY: The "neighborhood" field MUST match where the restaurant physically is. A restaurant on 18th St in Pilsen is in Pilsen, NOT Little Village. A spot in River North is NOT in The Loop. Use the street address to determine the correct neighborhood. If unsure, use the broader area (e.g. "West Side") rather than guessing wrong.
+- Real authentic restaurants in ${city} — must actually exist at the address you provide
+- NEIGHBORHOOD ACCURACY: The "neighborhood" field MUST match where the restaurant physically is based on its street address. Do NOT guess — use the address. A spot on W 18th St between Halsted and Western is Pilsen. A spot on W Cermak near Wentworth is Chinatown. A spot on N Milwaukee near California is Logan Square. Diversey Ave near Western is Bucktown/Logan Square, NOT Chinatown. W Superior near Halsted is River West/West Town, NOT Little Village. If unsure, use the broader area (e.g. "West Side") rather than guessing wrong.
 - The "address" field MUST be a real street address with ZIP code. Do NOT invent addresses.${isStreetFood ? '\n- STREET FOOD ONLY: Every result must be a mobile vendor, cart, truck, or informal stand. If it has indoor seating and a permanent address, it is a RESTAURANT — do not include it.' : ''}
+- SPREAD restaurants across DIFFERENT neighborhoods — do NOT put all results in the same neighborhood unless the user specifically asked for one area
 - Never repeat the same 3 spots
 - Write descriptions with FLAVOR — no bland generic sentences like "great atmosphere" or "worth a visit". Name specific dishes, textures, flavors.${conSabor ? '\n- CON SABOR: Every description MUST include a Latin cultural bridge — a comparison, pairing suggestion, or flavor connection to Latin cuisine.' : ''}`
           : `Eres SABOR — no un buscador genérico, sino un amigo foodie con sabor, opinión y calle. Hablas con calor: seguro, vibrante, como ese compa que te jala del brazo y dice "tienes que probar esto." Eres un ${foodContext} en ${city}.${conSabor ? ' MODO CON SABOR: Conectas cada cocina con la cultura latina. Compara platillos con sus equivalentes latinos ("este caldo pega como un buen pozole"), sugiere un complemento latino para cada spot ("acompáñalo con una horchata de la tienda de al lado"), y suelta conocimiento cultural que conecta tradiciones culinarias del mundo. Celebras TODAS las cocinas a través de los ojos de alguien criado con sabores latinos.' : ''}
@@ -434,13 +479,14 @@ Responde SOLO con JSON válido — sin markdown, sin backticks:
 }
 
 Reglas críticas:
-- Exactamente ${isPlanQuery ? String(planStops) : (tier === 'premium' ? '6' : '3')} resultados únicos
+- Exactamente ${isPlanQuery ? String(planStops) : (tier === 'premium' ? '6' : '3')} resultados únicos${isPlanQuery ? `\n- SON LAS ${currentHour}:00 — SOLO usa etiquetas de comida apropiadas para esta hora. Después de las 5pm: "Cena", "Late Night", "Postre", "Drinks". NUNCA uses "Mañana", "Desayuno", "Brunch", o "Almuerzo" después de las 5pm. NUNCA uses "Cena" o "Late Night" antes del mediodía.` : ''}
 - ${rotationNote || "Varía los restaurantes"}
 - Respeta radio ${tierConfig.radius}
-- ${isPremium ? "Puedes recomendar de cualquier barrio de Chicago" : `Mantente dentro de ${tierConfig.radius} del usuario`}
-- Restaurantes reales y auténticos de Chicago — deben existir realmente en la dirección que proporcionas
-- PRECISIÓN DE BARRIO: El campo "neighborhood" DEBE coincidir con donde el restaurante está físicamente. Un restaurante en la calle 18 en Pilsen es de Pilsen, NO de Little Village. Un spot en River North NO es del Loop. Usa la dirección para determinar el barrio correcto. Si no estás seguro, usa el área general (ej: "West Side") en vez de adivinar mal.
+- ${isPremium ? "Puedes recomendar de cualquier barrio de " + city : `Mantente dentro de ${tierConfig.radius} del usuario`}
+- Restaurantes reales y auténticos de ${city} — deben existir realmente en la dirección que proporcionas
+- PRECISIÓN DE BARRIO: El campo "neighborhood" DEBE coincidir con donde el restaurante está físicamente SEGÚN SU DIRECCIÓN. NO adivines. Un spot en W 18th St entre Halsted y Western es Pilsen. Un spot en W Cermak cerca de Wentworth es Chinatown. Diversey cerca de Western es Bucktown/Logan Square, NO Chinatown. W Superior cerca de Halsted es River West/West Town, NO Little Village. Si no estás seguro, usa el área general (ej: "West Side").
 - El campo "address" DEBE ser una dirección real con código postal. NO inventes direcciones.${isStreetFood ? '\n- SOLO COMIDA CALLEJERA: Cada resultado debe ser un vendedor móvil, carrito, troca o puesto informal. Si tiene asientos adentro y dirección permanente, es un RESTAURANTE — no lo incluyas.' : ''}
+- DISTRIBUYE restaurantes en DIFERENTES barrios — NO pongas todos en el mismo barrio a menos que el usuario pida uno específico
 - Nunca repitas los mismos 3 spots
 - Escribe descripciones con SABOR — nada de frases genéricas como "gran ambiente" o "vale la pena". Nombra platillos, texturas, sabores específicos.${conSabor ? '\n- CON SABOR: Cada descripción DEBE incluir un puente cultural latino — una comparación, sugerencia de complemento, o conexión de sabores con la cocina latina.' : ''}`,
         },
@@ -469,20 +515,11 @@ Reglas críticas:
       }
     }
 
-    // Enhance neighborhood data using ZIP lookup table + validate
+    // Verify neighborhoods via Google Places name lookup (parallel, cached)
+    // Looks up each restaurant NAME in Google → gets REAL address + neighborhood
+    // This fixes AI-hallucinated addresses AND neighborhoods in one shot
     if (parsed.results) {
-      parsed.results = parsed.results.map(r => {
-        if (r.address) {
-          const verifiedHood = getNeighborhood(r.address);
-          if (verifiedHood && verifiedHood !== r.neighborhood) {
-            console.log(`Neighborhood corrected: "${r.neighborhood}" → "${verifiedHood}" for ${r.name} (${r.address})`);
-            r.neighborhood = verifiedHood;
-          }
-        }
-        // Keep address for Google Places enrichment on client but strip full details
-        // Client only needs neighborhood for display
-        return r;
-      });
+      parsed.results = await verifyNeighborhoods(parsed.results, city);
     }
 
     if (!skipCache) setCache(cacheKey, parsed);
