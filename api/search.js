@@ -223,7 +223,8 @@ function resolveChicagoNeighborhood(address) {
 
   // 60657 — Lakeview / Boystown
   if (zip === '60657') {
-    if (/\bhalsted\b|\bbroadway\b/.test(streetLower) && /\bbelmont\b|\baddison\b/.test(streetLower)) return 'Boystown';
+    // Boystown: Halsted between Belmont and Addison (roughly 3200-3700 N)
+    if (/\bhalsted\b|\bbroadway\b/.test(streetLower)) return 'Boystown';
     return 'Lakeview';
   }
 
@@ -245,7 +246,7 @@ function resolveChicagoNeighborhood(address) {
 
   // 60625 — Albany Park / North Park
   if (zip === '60625') {
-    if (/\bkedzie\b|\blawrence\b|\bkimball\b/.test(streetLower)) return 'Albany Park';
+    if (/\bpulaski\b|\bbryn mawr\b|\bbalmoral\b|\bfoster\b/.test(streetLower)) return 'North Park';
     return 'Albany Park';
   }
 
