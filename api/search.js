@@ -751,7 +751,7 @@ Respond ONLY with valid JSON — no markdown, no backticks:
       "name": "Name — Exact Neighborhood",
       "emoji": "food emoji",
       "description": "${isPlanQuery ? "List dishes with prices: Cortado $4.50, Churro $3 · Food: $7.50 + tip $1.13 · Running total: $8.63 / $100" : conSabor ? "2 vivid sentences — describe the food with passion, then bridge it to Latin culture (compare flavors, suggest a Latin pairing, or connect food traditions). Be specific about dishes." : "2 vivid sentences about the spot — be opinionated, mention specific dishes and what makes them hit different. No generic praise."}",
-      "tag": "appropriate tag based on tier",
+      "tag": "${isPlanQuery ? 'meal period label for this stop — e.g. Breakfast, Lunch, Afternoon Snack, Dinner, Late Night, Dessert, Drinks (must match current time)' : 'appropriate tag based on tier'}",
       "distance": "0.0mi",
       "address": "full street address with ZIP (e.g. 1234 W 18th St, Chicago, IL 60608)",
       "neighborhood": "actual Chicago neighborhood name"
@@ -800,7 +800,7 @@ Responde SOLO con JSON válido — sin markdown, sin backticks:
       "name": "Nombre — Barrio exacto",
       "emoji": "emoji de comida",
       "description": "${isPlanQuery ? "Lista platillos con precios: Cortado $4.50, Churro $3 · Comida: $7.50 + propina $1.13 · Total acumulado: $8.63 / $100" : conSabor ? "2 frases vividas — describe la comida con pasión, luego conéctala con la cultura latina (compara sabores, sugiere un complemento latino, o conecta tradiciones). Sé específico con los platillos." : "2 frases vividas sobre el spot — sé opinado, menciona platillos específicos y qué los hace únicos. Nada de elogios genéricos."}",
-      "tag": "tag apropiado según tier",
+      "tag": "${isPlanQuery ? 'etiqueta de período de comida — ej: Desayuno, Almuerzo, Snack, Cena, Late Night, Postre, Drinks (debe corresponder a la hora actual)' : 'tag apropiado según tier'}",
       "distance": "0.0mi",
       "address": "dirección completa con ZIP (ej: 1234 W 18th St, Chicago, IL 60608)",
       "neighborhood": "nombre real del barrio de Chicago"
