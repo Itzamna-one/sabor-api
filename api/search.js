@@ -129,6 +129,193 @@ function getSearchGeo(city) {
   return CITY_GEO[key] || CITY_GEO['chicago'];
 }
 
+// ── Chicago address-to-neighborhood resolver ──
+// When Google Places doesn't return a neighborhood component (common for Chicago),
+// we resolve it ourselves using ZIP code + street name/number patterns.
+// This is the authoritative source — Chicago neighborhoods have well-known street boundaries.
+function resolveChicagoNeighborhood(address) {
+  if (!address) return null;
+  const addr = address.toLowerCase();
+
+  // Extract ZIP code
+  const zipMatch = addr.match(/\b(606\d{2}|460\d{2}|462\d{2}|473\d{2})\b/);
+  const zip = zipMatch ? zipMatch[1] : null;
+
+  // Extract street number (first number in address)
+  const numMatch = addr.match(/^(\d+)\s/);
+  const streetNum = numMatch ? parseInt(numMatch[1]) : null;
+
+  // Extract street name
+  const streetLower = addr.toLowerCase();
+
+  // ── Chicago ZIP-based resolution with street disambiguation ──
+
+  // 60608 — Pilsen / Chinatown / Bridgeport (needs street disambiguation)
+  if (zip === '60608') {
+    if (/\bwentworth\b/.test(streetLower)) return 'Chinatown';
+    if (/\barcher\b/.test(streetLower) && streetNum && streetNum < 2400) return 'Chinatown';
+    if (/\bcermak\b|\b22nd\b/.test(streetLower)) {
+      // Cermak near Wentworth = Chinatown, Cermak west of Halsted = Pilsen
+      if (streetNum && streetNum < 400) return 'Chinatown'; // near Wentworth (east)
+      return 'Pilsen';
+    }
+    if (/\b18th\b|\b19th\b|\b20th\b|\b21st\b/.test(streetLower)) return 'Pilsen';
+    if (/\b16th\b|\b17th\b/.test(streetLower)) return 'Pilsen';
+    if (/\bhalsted\b/.test(streetLower)) {
+      if (streetNum && streetNum >= 3000) return 'Bridgeport';
+      return 'Pilsen';
+    }
+    if (/\b31st\b|\b32nd\b|\b33rd\b|\b34th\b|\b35th\b/.test(streetLower)) return 'Bridgeport';
+    if (/\bmorgan\b|\brack\b|\bthroop\b|\bloomis\b/.test(streetLower)) return 'Pilsen';
+    return 'Pilsen'; // default for 60608
+  }
+
+  // 60616 — Chinatown / Bridgeport / Bronzeville
+  if (zip === '60616') {
+    if (/\bwentworth\b|\barcher\b/.test(streetLower)) return 'Chinatown';
+    if (/\bking\b|\bcottage\b|\bstate\b/.test(streetLower)) return 'Bronzeville';
+    if (/\bhalsted\b|\bmorgan\b/.test(streetLower)) return 'Bridgeport';
+    return 'Chinatown';
+  }
+
+  // 60623 — Little Village / Lawndale
+  if (zip === '60623') {
+    if (/\b26th\b/.test(streetLower)) return 'Little Village';
+    return 'Little Village';
+  }
+
+  // 60622 — Wicker Park / Ukrainian Village / West Town
+  if (zip === '60622') {
+    if (/\bmilwaukee\b/.test(streetLower)) return 'Wicker Park';
+    if (/\bnorth\s+ave\b|\bdamen\b/.test(streetLower)) return 'Wicker Park';
+    if (/\bdivision\b/.test(streetLower)) return 'Ukrainian Village';
+    if (/\bchicago\s+ave\b|\baugusta\b|\berie\b|\bhuron\b|\bsuperior\b/.test(streetLower)) return 'West Town';
+    if (/\bwestern\b/.test(streetLower)) return 'Ukrainian Village';
+    return 'Wicker Park';
+  }
+
+  // 60647 — Logan Square / Bucktown
+  if (zip === '60647') {
+    if (/\bmilwaukee\b|\bkedzie\b|\bfullerton\b/.test(streetLower) && streetNum && streetNum >= 2400) return 'Logan Square';
+    if (/\bnorth\s+ave\b|\bdamen\b/.test(streetLower)) return 'Bucktown';
+    return 'Logan Square';
+  }
+
+  // 60607 — West Loop / Greektown
+  if (zip === '60607') {
+    if (/\brandolph\b|\bfulton\b|\bmadison\b|\bwashington\b/.test(streetLower)) return 'West Loop';
+    if (/\bhalsted\b|\bvan\s*buren\b/.test(streetLower)) return 'Greektown';
+    return 'West Loop';
+  }
+
+  // 60654 — River North
+  if (zip === '60654') return 'River North';
+
+  // 60610 — Gold Coast / Old Town
+  if (zip === '60610') {
+    if (/\brush\b|\bstate\b|\bgold\b/.test(streetLower)) return 'Gold Coast';
+    if (/\bwells\b|\bnorth\b|\bsedgwick\b/.test(streetLower)) return 'Old Town';
+    return 'Gold Coast';
+  }
+
+  // 60614 — Lincoln Park
+  if (zip === '60614') return 'Lincoln Park';
+
+  // 60657 — Lakeview / Boystown
+  if (zip === '60657') {
+    if (/\bhalsted\b|\bbroadway\b/.test(streetLower) && /\bbelmont\b|\baddison\b/.test(streetLower)) return 'Boystown';
+    return 'Lakeview';
+  }
+
+  // 60613 — Wrigleyville / North Lakeview
+  if (zip === '60613') return 'Lakeview';
+
+  // 60640 — Uptown / Andersonville
+  if (zip === '60640') {
+    if (/\bclark\b/.test(streetLower) && /\bfoster\b|\bbalmoral\b|\bberwyn\b/.test(streetLower)) return 'Andersonville';
+    if (/\bbroadway\b|\blawrence\b|\bargyle\b/.test(streetLower)) return 'Uptown';
+    return 'Uptown';
+  }
+
+  // 60626 — Rogers Park
+  if (zip === '60626') return 'Rogers Park';
+
+  // 60659 — West Ridge / Devon Ave
+  if (zip === '60659') return 'Devon Ave';
+
+  // 60625 — Albany Park / North Park
+  if (zip === '60625') {
+    if (/\bkedzie\b|\blawrence\b|\bkimball\b/.test(streetLower)) return 'Albany Park';
+    return 'Albany Park';
+  }
+
+  // 60618 — North Center / Roscoe Village
+  if (zip === '60618') {
+    if (/\broscoe\b|\bdamen\b/.test(streetLower)) return 'Roscoe Village';
+    return 'North Center';
+  }
+
+  // 60609 — Back of the Yards / Canaryville
+  if (zip === '60609') {
+    if (/\b47th\b|\b43rd\b|\bashland\b/.test(streetLower)) return 'Back of the Yards';
+    return 'Back of the Yards';
+  }
+
+  // 60632 — Brighton Park / Archer Heights
+  if (zip === '60632') {
+    if (/\barcher\b/.test(streetLower)) return 'Archer Heights';
+    return 'Brighton Park';
+  }
+
+  // 60629 — Chicago Lawn / Marquette Park
+  if (zip === '60629') return 'Chicago Lawn';
+
+  // 60636 — West Englewood
+  if (zip === '60636') return 'West Englewood';
+
+  // 60615 — Hyde Park
+  if (zip === '60615') return 'Hyde Park';
+  // 60637 — Hyde Park / Woodlawn
+  if (zip === '60637') return 'Hyde Park';
+
+  // 60612 — Near West Side / Medical District
+  if (zip === '60612') return 'Near West Side';
+
+  // 60624 — Humboldt Park / East Garfield Park
+  if (zip === '60624') {
+    if (/\bdivision\b|\bnorth\b|\bcalifornia\b/.test(streetLower)) return 'Humboldt Park';
+    return 'Humboldt Park';
+  }
+
+  // 60651 — Humboldt Park / West Humboldt
+  if (zip === '60651') return 'Humboldt Park';
+
+  // 60639 — Belmont Cragin / Hermosa
+  if (zip === '60639') {
+    if (/\bfullerton\b|\bdiversey\b/.test(streetLower)) return 'Belmont Cragin';
+    return 'Belmont Cragin';
+  }
+
+  // 60641 — Portage Park / Old Irving
+  if (zip === '60641') {
+    if (/\birving\b/.test(streetLower)) return 'Old Irving Park';
+    return 'Portage Park';
+  }
+
+  // ── Chicago suburbs (by ZIP) ──
+  if (zip === '60804' || zip === '60805') return 'Cicero';
+  if (zip === '60402') return 'Berwyn';
+  if (zip === '60201' || zip === '60202') return 'Evanston';
+  if (zip === '60173' || zip === '60194') return 'Schaumburg';
+
+  // ── Indiana (by ZIP prefix) ──
+  if (zip && zip.startsWith('460')) return null; // Indianapolis — let Google handle
+  if (zip && zip.startsWith('463')) return null; // Fort Wayne
+  if (zip && zip.startsWith('464')) return null; // Gary/NW Indiana
+
+  return null; // unknown — don't guess
+}
+
 // Detect street food / carts / trucks — these shouldn't have "restaurant" appended
 const STREET_FOOD_KEYWORDS = /\b(cart|truck|stand|vendor|paletero|elotero|tamale|tamal|street food|food truck|pop-?up|market|mercado|feria|tianguis|puesto)\b/i;
 
@@ -214,17 +401,10 @@ async function _placesLookup(textQuery, geo, apiKey, city) {
     neighborhood = hoodComp?.longText || (locality && locality.toLowerCase() !== cityBase ? locality : null);
   }
 
-  // Fallback: if no neighborhood from addressComponents, try to extract from formatted address
-  // e.g. "1234 W Diversey Ave, Chicago, IL 60614" — can at least confirm the city
+  // Fallback: resolve neighborhood from address using ZIP + street patterns
+  // Google often doesn't return "neighborhood" in addressComponents for Chicago
   if (!neighborhood && realAddress) {
-    // Check if address is in a known neighborhood area via NEIGHBORHOOD_VIBES keys
-    const addrLower = realAddress.toLowerCase();
-    for (const hood of Object.keys(NEIGHBORHOOD_VIBES)) {
-      if (addrLower.includes(hood.toLowerCase())) {
-        neighborhood = hood;
-        break;
-      }
-    }
+    neighborhood = resolveChicagoNeighborhood(realAddress);
   }
 
   if (!neighborhood && !realAddress) return null; // completely useless result
