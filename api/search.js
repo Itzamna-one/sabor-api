@@ -519,6 +519,19 @@ async function verifyNeighborhoods(results, city) {
 
   const promises = results.map(async (r) => {
     try {
+      // Step 0: If AI returned an address, try our ZIP resolver FIRST (most accurate for Chicago)
+      // This avoids Google returning a DIFFERENT restaurant with the same name in a different neighborhood
+      if (r.address) {
+        const resolvedHood = resolveChicagoNeighborhood(r.address);
+        if (resolvedHood) {
+          if (resolvedHood !== r.neighborhood) {
+            console.log(`🏘️ ZIP resolver corrected: "${r.neighborhood}" → "${resolvedHood}" for ${r.name} (${r.address})`);
+          }
+          r.neighborhood = resolvedHood;
+          return r; // Trust AI's address + our resolver over Google name lookup
+        }
+      }
+
       // Step 1: Try name lookup (works for real restaurant names)
       const realData = await lookupRealNeighborhood(r.name, city);
       if (realData) {
