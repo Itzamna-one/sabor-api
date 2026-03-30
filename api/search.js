@@ -302,6 +302,63 @@ function resolveChicagoNeighborhood(address) {
     return 'Portage Park';
   }
 
+  // 60605 — South Loop / Printer's Row
+  if (zip === '60605') return 'South Loop';
+
+  // 60601/60602/60603/60604 — The Loop (Downtown)
+  if (zip === '60601' || zip === '60602' || zip === '60603' || zip === '60604') return 'The Loop';
+
+  // 60611 — Streeterville / Mag Mile
+  if (zip === '60611') return 'Streeterville';
+
+  // 60642 — Goose Island / Near North
+  if (zip === '60642') return 'Noble Square';
+
+  // 60660 — Edgewater
+  if (zip === '60660') return 'Edgewater';
+
+  // 60645 — West Ridge / Peterson Park
+  if (zip === '60645') return 'West Ridge';
+
+  // 60653 — Bronzeville / Douglas
+  if (zip === '60653') {
+    if (/\bcottage\b|\bking\b|\bdrexel\b/.test(streetLower)) return 'Bronzeville';
+    return 'Bronzeville';
+  }
+
+  // 60619 — Chatham / Avalon Park
+  if (zip === '60619') return 'Chatham';
+
+  // 60620 — Auburn Gresham
+  if (zip === '60620') return 'Auburn Gresham';
+
+  // 60617 — South Chicago / South Shore
+  if (zip === '60617') return 'South Chicago';
+
+  // 60649 — South Shore
+  if (zip === '60649') return 'South Shore';
+
+  // 60630 — Jefferson Park
+  if (zip === '60630') return 'Jefferson Park';
+
+  // 60631 — Edison Park / Norwood Park
+  if (zip === '60631') return 'Edison Park';
+
+  // 60634 — Dunning / Montclare
+  if (zip === '60634') return 'Dunning';
+
+  // 60644 — Austin
+  if (zip === '60644') return 'Austin';
+
+  // 60621 — Englewood
+  if (zip === '60621') return 'Englewood';
+
+  // 60628 — Roseland / Pullman
+  if (zip === '60628') {
+    if (/\bpullman\b|\b111th\b|\bcottage\b/.test(streetLower)) return 'Pullman';
+    return 'Roseland';
+  }
+
   // ── Chicago suburbs (by ZIP) ──
   if (zip === '60804' || zip === '60805') return 'Cicero';
   if (zip === '60402') return 'Berwyn';
@@ -363,57 +420,62 @@ async function lookupRealNeighborhood(name, city) {
 
 // Core Google Places Text Search call — extracted for retry logic
 async function _placesLookup(textQuery, geo, apiKey, city) {
-  const resp = await fetch('https://places.googleapis.com/v1/places:searchText', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Goog-Api-Key': apiKey,
-      'X-Goog-FieldMask': 'places.formattedAddress,places.addressComponents,places.displayName',
-    },
-    body: JSON.stringify({
-      textQuery,
-      maxResultCount: 1,
-      locationBias: {
-        circle: {
-          center: { latitude: geo.lat, longitude: geo.lng },
-          radius: 80000,
-        },
+  try {
+    const resp = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'places.formattedAddress,places.addressComponents,places.displayName',
       },
-    }),
-  });
+      body: JSON.stringify({
+        textQuery,
+        maxResultCount: 1,
+        locationBias: {
+          circle: {
+            center: { latitude: geo.lat, longitude: geo.lng },
+            radius: 80000,
+          },
+        },
+      }),
+    });
 
-  if (!resp.ok) return null;
-  const data = await resp.json();
-  const place = data.places?.[0];
-  if (!place) return null;
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const place = data.places?.[0];
+    if (!place) return null;
 
-  // Extract neighborhood — our ZIP+street resolver takes priority for Chicago
-  // Google's addressComponents often returns wrong/generic names like "Lower West Side"
-  // instead of what Chicagoans actually call these neighborhoods
-  let neighborhood = null;
-  let realAddress = place.formattedAddress || null;
-  const cityBase = city.toLowerCase().split(',')[0].trim();
+    // Extract neighborhood — our ZIP+street resolver takes priority for Chicago
+    // Google's addressComponents often returns wrong/generic names like "Lower West Side"
+    // instead of what Chicagoans actually call these neighborhoods
+    let neighborhood = null;
+    let realAddress = place.formattedAddress || null;
+    const cityBase = city.toLowerCase().split(',')[0].trim();
 
-  // Step 1: ALWAYS try our Chicago resolver first — it's more accurate than Google
-  if (realAddress) {
-    neighborhood = resolveChicagoNeighborhood(realAddress);
-    if (neighborhood) {
-      console.log(`🏘️ Resolver: "${realAddress}" → ${neighborhood}`);
+    // Step 1: ALWAYS try our Chicago resolver first — it's more accurate than Google
+    if (realAddress) {
+      neighborhood = resolveChicagoNeighborhood(realAddress);
+      if (neighborhood) {
+        console.log(`🏘️ Resolver: "${realAddress}" → ${neighborhood}`);
+      }
     }
-  }
 
-  // Step 2: If resolver didn't match (non-Chicago city, unknown ZIP), fall back to Google
-  if (!neighborhood && place.addressComponents) {
-    const hoodComp = place.addressComponents.find(c =>
-      c.types?.includes('neighborhood') || c.types?.includes('sublocality') || c.types?.includes('sublocality_level_1'));
-    const localityComp = place.addressComponents.find(c => c.types?.includes('locality'));
-    const locality = localityComp?.longText || null;
-    neighborhood = hoodComp?.longText || (locality && locality.toLowerCase() !== cityBase ? locality : null);
-  }
+    // Step 2: If resolver didn't match (non-Chicago city, unknown ZIP), fall back to Google
+    if (!neighborhood && place.addressComponents) {
+      const hoodComp = place.addressComponents.find(c =>
+        c.types?.includes('neighborhood') || c.types?.includes('sublocality') || c.types?.includes('sublocality_level_1'));
+      const localityComp = place.addressComponents.find(c => c.types?.includes('locality'));
+      const locality = localityComp?.longText || null;
+      neighborhood = hoodComp?.longText || (locality && locality.toLowerCase() !== cityBase ? locality : null);
+    }
 
-  if (!neighborhood && !realAddress) return null; // completely useless result
-  const displayName = place.displayName?.text || null;
-  return { neighborhood, address: realAddress, displayName };
+    if (!neighborhood && !realAddress) return null; // completely useless result
+    const displayName = place.displayName?.text || null;
+    return { neighborhood, address: realAddress, displayName };
+  } catch (err) {
+    console.error(`_placesLookup failed for "${textQuery}":`, err.message);
+    return null;
+  }
 }
 
 // Extract cuisine keyword from a result's name/description for fallback searches
@@ -455,49 +517,54 @@ async function verifyNeighborhoods(results, city) {
   const geo = getSearchGeo(city);
 
   const promises = results.map(async (r) => {
-    // Step 1: Try name lookup (works for real restaurant names)
-    const realData = await lookupRealNeighborhood(r.name, city);
-    if (realData) {
-      if (realData.neighborhood) {
-        if (realData.neighborhood !== r.neighborhood) {
-          console.log(`🏘️ Neighborhood corrected: "${r.neighborhood}" → "${realData.neighborhood}" for ${r.name}`);
+    try {
+      // Step 1: Try name lookup (works for real restaurant names)
+      const realData = await lookupRealNeighborhood(r.name, city);
+      if (realData) {
+        if (realData.neighborhood) {
+          if (realData.neighborhood !== r.neighborhood) {
+            console.log(`🏘️ Neighborhood corrected: "${r.neighborhood}" → "${realData.neighborhood}" for ${r.name}`);
+          }
+          r.neighborhood = realData.neighborhood;
         }
-        r.neighborhood = realData.neighborhood;
-      }
-      if (realData.address) {
-        r.address = realData.address;
-      }
-      return r;
-    }
-
-    // Step 2: Name not found (likely hallucinated) — fallback to cuisine+city search
-    // DON'T include AI's neighborhood in query — it's likely wrong and creates self-fulfilling prophecy
-    // Just search for cuisine type in the city and let Google + our resolver determine the real neighborhood
-    if (apiKey) {
-      const cuisine = extractCuisine(r);
-      const fallbackQuery = `best ${cuisine} restaurant ${city}`.trim();
-      console.log(`🏘️ Name lookup failed for "${r.name}" — trying fallback: "${fallbackQuery}"`);
-
-      const fallback = await _placesLookup(fallbackQuery, geo, apiKey, city);
-      if (fallback) {
-        const oldName = r.name;
-        // Replace name with real restaurant found by Google (keeps cuisine match)
-        if (fallback.displayName) {
-          r.name = `${fallback.displayName}${fallback.neighborhood ? ' — ' + fallback.neighborhood : ''}`;
+        if (realData.address) {
+          r.address = realData.address;
         }
-        if (fallback.neighborhood) {
-          r.neighborhood = fallback.neighborhood;
-        }
-        if (fallback.address) {
-          r.address = fallback.address;
-        }
-        console.log(`🏘️ Replaced hallucinated "${oldName}" → real "${r.name}" (${r.neighborhood})`);
         return r;
       }
-    }
 
-    console.log(`🏘️ All lookups failed for "${r.name}" — keeping AI data`);
-    return r;
+      // Step 2: Name not found (likely hallucinated) — fallback to cuisine+city search
+      // DON'T include AI's neighborhood in query — it's likely wrong and creates self-fulfilling prophecy
+      // Just search for cuisine type in the city and let Google + our resolver determine the real neighborhood
+      if (apiKey) {
+        const cuisine = extractCuisine(r);
+        const fallbackQuery = `best ${cuisine} restaurant ${city}`.trim();
+        console.log(`🏘️ Name lookup failed for "${r.name}" — trying fallback: "${fallbackQuery}"`);
+
+        const fallback = await _placesLookup(fallbackQuery, geo, apiKey, city);
+        if (fallback) {
+          const oldName = r.name;
+          // Replace name with real restaurant found by Google (keeps cuisine match)
+          if (fallback.displayName) {
+            r.name = `${fallback.displayName}${fallback.neighborhood ? ' — ' + fallback.neighborhood : ''}`;
+          }
+          if (fallback.neighborhood) {
+            r.neighborhood = fallback.neighborhood;
+          }
+          if (fallback.address) {
+            r.address = fallback.address;
+          }
+          console.log(`🏘️ Replaced hallucinated "${oldName}" → real "${r.name}" (${r.neighborhood})`);
+          return r;
+        }
+      }
+
+      console.log(`🏘️ All lookups failed for "${r.name}" — keeping AI data`);
+      return r;
+    } catch (err) {
+      console.error(`🏘️ Verification error for "${r.name}":`, err.message);
+      return r; // Return original data instead of crashing
+    }
   });
 
   return Promise.all(promises);
@@ -580,22 +647,23 @@ export default async function handler(req, res) {
 
   // Time-aware planning — use client's local hour (phone knows real timezone)
   // Fall back to server UTC if client doesn't send it
-  const currentHour = localHour != null ? parseInt(localHour) : new Date().getHours();
+  const parsedHour = localHour != null ? parseInt(localHour) : NaN;
+  const currentHour = (!isNaN(parsedHour) && parsedHour >= 0 && parsedHour <= 23) ? parsedHour : new Date().getHours();
   // Determine remaining meals based on current time
   let timeContext = '';
   let planStops = 4;
   if (isPlanQuery) {
     if (currentHour >= 20) {        // 8pm+: late night only
-      timeContext = `CURRENT TIME: ${currentHour}:00 (late evening). The user is planning NOW at night. ONLY plan dinner and/or late-night food — 1-2 stops maximum. DO NOT suggest breakfast, morning coffee, brunch, or lunch — those are IMPOSSIBLE at this hour. Use meal labels like "Dinner" or "Late Night", never "Morning" or "Lunch".`;
+      timeContext = `CURRENT TIME: ${currentHour}:00 (late evening). The user is planning NOW at night. ONLY plan dinner and/or late-night food — exactly 2 stops. DO NOT suggest breakfast, morning coffee, brunch, or lunch — those are IMPOSSIBLE at this hour. Use meal labels like "Dinner" or "Late Night", never "Morning" or "Lunch".`;
       planStops = 2;
     } else if (currentHour >= 17) { // 5-8pm: dinner + dessert
-      timeContext = `CURRENT TIME: ${currentHour}:00 (evening). Plan dinner + dessert/drinks — 2-3 stops. DO NOT suggest breakfast or lunch — those are past. Use labels like "Dinner", "Dessert", "After-Dinner Drinks".`;
+      timeContext = `CURRENT TIME: ${currentHour}:00 (evening). Plan dinner + dessert/drinks — exactly 3 stops. DO NOT suggest breakfast or lunch — those are past. Use labels like "Dinner", "Dessert", "After-Dinner Drinks".`;
       planStops = 3;
     } else if (currentHour >= 14) { // 2-5pm: afternoon snack + dinner
-      timeContext = `CURRENT TIME: ${currentHour}:00 (mid-afternoon). Skip breakfast and lunch (too late). Start with an afternoon coffee or snack, then plan dinner. 2-3 stops. Use labels like "Afternoon Snack", "Dinner".`;
+      timeContext = `CURRENT TIME: ${currentHour}:00 (mid-afternoon). Skip breakfast and lunch (too late). Start with an afternoon coffee or snack, then plan dinner. Exactly 3 stops. Use labels like "Afternoon Snack", "Dinner".`;
       planStops = 3;
     } else if (currentHour >= 11) { // 11am-2pm: lunch onward
-      timeContext = `CURRENT TIME: ${currentHour}:00 (around lunchtime). Skip breakfast (too late). Start with lunch, then afternoon snack, then dinner. 3 stops.`;
+      timeContext = `CURRENT TIME: ${currentHour}:00 (around lunchtime). Skip breakfast (too late). Start with lunch, then afternoon snack, then dinner. Exactly 3 stops.`;
       planStops = 3;
     } else {                         // Before 11am: full day
       timeContext = `CURRENT TIME: ${currentHour}:00 (morning). Plan the full day: breakfast/coffee, lunch, afternoon snack, and dinner. 4 stops.`;

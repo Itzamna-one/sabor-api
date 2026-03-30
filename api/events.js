@@ -885,7 +885,7 @@ async function fetchTicketmasterEvents(city) {
       if (startTime) {
         const [h, m] = startTime.split(':');
         const hour = parseInt(h);
-        timeStr = `${hour > 12 ? hour - 12 : hour}:${m} ${hour >= 12 ? 'PM' : 'AM'}`;
+        timeStr = `${hour === 0 ? 12 : hour > 12 ? hour - 12 : hour}:${m} ${hour >= 12 ? 'PM' : 'AM'}`;
       }
 
       return {
@@ -929,7 +929,9 @@ export default async function handler(req, res) {
   let tmEvents = [];
   try {
     tmEvents = await fetchTicketmasterEvents(city);
-  } catch (_) {}
+  } catch (err) {
+    console.error('Ticketmaster fetch failed:', err.message);
+  }
 
   // Curated SABOR events (all cities)
   let curatedEvents = ALL_SABOR_EVENTS.filter(e =>
