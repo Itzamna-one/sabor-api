@@ -387,24 +387,28 @@ async function _placesLookup(textQuery, geo, apiKey, city) {
   const place = data.places?.[0];
   if (!place) return null;
 
-  // Extract neighborhood from addressComponents
+  // Extract neighborhood — our ZIP+street resolver takes priority for Chicago
+  // Google's addressComponents often returns wrong/generic names like "Lower West Side"
+  // instead of what Chicagoans actually call these neighborhoods
   let neighborhood = null;
   let realAddress = place.formattedAddress || null;
   const cityBase = city.toLowerCase().split(',')[0].trim();
-  if (place.addressComponents) {
+
+  // Step 1: ALWAYS try our Chicago resolver first — it's more accurate than Google
+  if (realAddress) {
+    neighborhood = resolveChicagoNeighborhood(realAddress);
+    if (neighborhood) {
+      console.log(`🏘️ Resolver: "${realAddress}" → ${neighborhood}`);
+    }
+  }
+
+  // Step 2: If resolver didn't match (non-Chicago city, unknown ZIP), fall back to Google
+  if (!neighborhood && place.addressComponents) {
     const hoodComp = place.addressComponents.find(c =>
       c.types?.includes('neighborhood') || c.types?.includes('sublocality') || c.types?.includes('sublocality_level_1'));
     const localityComp = place.addressComponents.find(c => c.types?.includes('locality'));
     const locality = localityComp?.longText || null;
-    // For major cities: use neighborhood component
-    // For suburbs/smaller cities: use locality (city name)
     neighborhood = hoodComp?.longText || (locality && locality.toLowerCase() !== cityBase ? locality : null);
-  }
-
-  // Fallback: resolve neighborhood from address using ZIP + street patterns
-  // Google often doesn't return "neighborhood" in addressComponents for Chicago
-  if (!neighborhood && realAddress) {
-    neighborhood = resolveChicagoNeighborhood(realAddress);
   }
 
   if (!neighborhood && !realAddress) return null; // completely useless result
@@ -466,12 +470,12 @@ async function verifyNeighborhoods(results, city) {
       return r;
     }
 
-    // Step 2: Name not found (likely hallucinated) — fallback to cuisine+area search
-    // Search for a REAL restaurant of the same cuisine type in the AI's claimed area
+    // Step 2: Name not found (likely hallucinated) — fallback to cuisine+city search
+    // DON'T include AI's neighborhood in query — it's likely wrong and creates self-fulfilling prophecy
+    // Just search for cuisine type in the city and let Google + our resolver determine the real neighborhood
     if (apiKey) {
       const cuisine = extractCuisine(r);
-      const aiHood = r.neighborhood || '';
-      const fallbackQuery = `${cuisine} restaurant ${aiHood} ${city}`.trim();
+      const fallbackQuery = `best ${cuisine} restaurant ${city}`.trim();
       console.log(`🏘️ Name lookup failed for "${r.name}" — trying fallback: "${fallbackQuery}"`);
 
       const fallback = await _placesLookup(fallbackQuery, geo, apiKey, city);
