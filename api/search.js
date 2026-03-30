@@ -138,7 +138,7 @@ function resolveChicagoNeighborhood(address) {
   const addr = address.toLowerCase();
 
   // Extract ZIP code
-  const zipMatch = addr.match(/\b(606\d{2}|460\d{2}|462\d{2}|473\d{2})\b/);
+  const zipMatch = addr.match(/\b(6\d{4}|460\d{2}|462\d{2}|463\d{2}|464\d{2}|473\d{2})\b/);
   const zip = zipMatch ? zipMatch[1] : null;
 
   // Extract street number (first number in address)
