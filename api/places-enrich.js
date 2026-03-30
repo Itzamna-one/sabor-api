@@ -1,16 +1,47 @@
 // api/places-enrich.js — Google Places enrichment with geo-bias + bounding box validation
 
-// Chicago center coordinates (50km bias radius)
+// City geo-bias centers + bounding boxes for result validation (IL/IN expansion)
 const CITY_GEO = {
-  'chicago': { lat: 41.8781, lng: -87.6298, radius: 50000 },
+  'chicago':       { lat: 41.8781, lng: -87.6298, radius: 50000 },
+  'aurora':        { lat: 41.7606, lng: -88.3201, radius: 30000 },
+  'joliet':        { lat: 41.5250, lng: -88.0817, radius: 30000 },
+  'naperville':    { lat: 41.7508, lng: -88.1535, radius: 25000 },
+  'elgin':         { lat: 42.0354, lng: -88.2826, radius: 25000 },
+  'waukegan':      { lat: 42.3636, lng: -87.8448, radius: 25000 },
+  'cicero':        { lat: 41.8456, lng: -87.7539, radius: 15000 },
+  'berwyn':        { lat: 41.8506, lng: -87.7937, radius: 15000 },
+  'rockford':      { lat: 42.2711, lng: -89.0940, radius: 30000 },
+  'springfield':   { lat: 39.7817, lng: -89.6501, radius: 30000 },
+  'champaign':     { lat: 40.1164, lng: -88.2434, radius: 25000 },
+  'evanston':      { lat: 42.0451, lng: -87.6877, radius: 15000 },
+  'schaumburg':    { lat: 42.0334, lng: -88.0834, radius: 20000 },
+  'indianapolis':  { lat: 39.7684, lng: -86.1581, radius: 50000 },
+  'fort wayne':    { lat: 41.0793, lng: -85.1394, radius: 30000 },
+  'south bend':    { lat: 41.6764, lng: -86.2520, radius: 25000 },
+  'gary':          { lat: 41.5934, lng: -87.3464, radius: 25000 },
+  'east chicago':  { lat: 41.6392, lng: -87.4545, radius: 15000 },
+  'hammond':       { lat: 41.5834, lng: -87.5001, radius: 20000 },
+  'valparaiso':    { lat: 41.4731, lng: -87.0611, radius: 20000 },
+  'evansville':    { lat: 37.9716, lng: -87.5711, radius: 30000 },
+  'terre haute':   { lat: 39.4667, lng: -87.4139, radius: 25000 },
 };
-
-// Chicago bounding box for result validation
-const CHICAGO_BOUNDS = { minLat: 41.6, maxLat: 42.1, minLng: -88.0, maxLng: -87.5 };
 
 function getGeoBias(city) {
   const key = city.toLowerCase().split(',')[0].trim();
   return CITY_GEO[key] || CITY_GEO['chicago'];
+}
+
+// Check if a coordinate is within a city's service area (geo-bias center + radius)
+function isInServiceArea(lat, lng, city) {
+  const geo = getGeoBias(city);
+  const R = 6371000; // Earth radius in meters
+  const dLat = (lat - geo.lat) * Math.PI / 180;
+  const dLng = (lng - geo.lng) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(geo.lat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) *
+    Math.sin(dLng/2) * Math.sin(dLng/2);
+  const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return dist <= (geo.radius || 50000) * 1.5; // 1.5x buffer
 }
 
 async function getPlaceDetails(name, city, apiKey, isStreetFood = false) {
@@ -50,14 +81,12 @@ async function getPlaceDetails(name, city, apiKey, isStreetFood = false) {
       'PRICE_LEVEL_VERY_EXPENSIVE': '$$$$',
     };
 
-    // Validate result is actually in Chicago metro (reject NYC etc)
+    // Validate result is actually in the target city's service area (reject distant results)
     const lat = p.location?.latitude;
     const lng = p.location?.longitude;
     if (lat && lng) {
-      const inChicago = lat >= CHICAGO_BOUNDS.minLat && lat <= CHICAGO_BOUNDS.maxLat
-                     && lng >= CHICAGO_BOUNDS.minLng && lng <= CHICAGO_BOUNDS.maxLng;
-      if (!inChicago) {
-        console.log(`Rejected out-of-area result: ${name} at ${lat},${lng}`);
+      if (!isInServiceArea(lat, lng, city)) {
+        console.log(`Rejected out-of-area result: ${name} at ${lat},${lng} (city: ${city})`);
         return null;
       }
     }

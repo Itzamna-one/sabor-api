@@ -531,6 +531,13 @@ export default async function handler(req, res) {
 
   if (!query) return res.status(400).json({ error: "Query is required" });
 
+  // Truncate user input arrays to prevent token overflow in AI prompt
+  const safePreviousRestaurants = (previousRestaurants || []).slice(-8);
+  const safeFavoriteNeighborhoods = (favoriteNeighborhoods || []).slice(0, 5);
+  const safeCuisines = (cuisines || []).slice(0, 10);
+  const safeDiets = (diets || []).slice(0, 10);
+  const safeVibes = (vibes || []).slice(0, 5);
+
   // Fetch trending terms to boost relevant results
   let trendingContext = '';
   // Trends are supplementary - skip to avoid adding latency
@@ -548,7 +555,7 @@ export default async function handler(req, res) {
   const tierConfig = TIER_CONFIG[tier] || TIER_CONFIG.free;
   const isPremium = tier === "premium";
   const hasCredits = tier === "credits";
-  const hasProfile = cuisines.length > 0 || diets.length > 0 || vibes.length > 0;
+  const hasProfile = safeCuisines.length > 0 || safeDiets.length > 0 || safeVibes.length > 0;
 
   // Build neighborhood context
   let neighborhoodContext = "";
@@ -558,14 +565,14 @@ export default async function handler(req, res) {
   } else if (currentNeighborhood) {
     const vibe = NEIGHBORHOOD_VIBES[currentNeighborhood] || "";
     neighborhoodContext = `El usuario está en: ${currentNeighborhood} (${vibe}). Radio: ${tierConfig.radius}.`;
-    if (isPremium && favoriteNeighborhoods.length > 0) {
-      neighborhoodContext += ` Sus barrios favoritos: ${favoriteNeighborhoods.join(", ")}.`;
+    if (isPremium && safeFavoriteNeighborhoods.length > 0) {
+      neighborhoodContext += ` Sus barrios favoritos: ${safeFavoriteNeighborhoods.join(", ")}.`;
     }
   }
 
   // Rotation instruction
-  const rotationNote = previousRestaurants.length > 0
-    ? `NUNCA repitas estos restaurantes: ${previousRestaurants.join(", ")}.`
+  const rotationNote = safePreviousRestaurants.length > 0
+    ? `NUNCA repitas estos restaurantes: ${safePreviousRestaurants.join(", ")}.`
     : "";
 
   // Detect plan queries early (needed by personalization)
@@ -599,8 +606,8 @@ export default async function handler(req, res) {
   // Personalization
   const personalization = hasProfile
     ? (language === 'en'
-      ? `User profile: ${profileContext}. Dietary needs: ${diets.join(", ") || "no restrictions"}. Preferred cuisines: ${cuisines.join(", ") || "open to all"}. Vibe: ${vibes.join(", ") || "any"}.${isPlanQuery ? ' IMPORTANT: All dish recommendations MUST respect these dietary preferences. Do not suggest dishes that conflict with the user\'s diet.' : ''}`
-      : `Perfil: ${profileContext}. Dieta: ${diets.join(", ") || "sin restricciones"}. Cocinas preferidas: ${cuisines.join(", ") || "abierto a todo"}. Ambiente: ${vibes.join(", ") || "cualquiera"}.${isPlanQuery ? ' IMPORTANTE: Todas las recomendaciones de platillos DEBEN respetar estas preferencias dietéticas. No sugieras platillos que contradigan la dieta del usuario.' : ''}`)
+      ? `User profile: ${profileContext}. Dietary needs: ${safeDiets.join(", ") || "no restrictions"}. Preferred cuisines: ${safeCuisines.join(", ") || "open to all"}. Vibe: ${safeVibes.join(", ") || "any"}.${isPlanQuery ? ' IMPORTANT: All dish recommendations MUST respect these dietary preferences. Do not suggest dishes that conflict with the user\'s diet.' : ''}`
+      : `Perfil: ${profileContext}. Dieta: ${safeDiets.join(", ") || "sin restricciones"}. Cocinas preferidas: ${safeCuisines.join(", ") || "abierto a todo"}. Ambiente: ${safeVibes.join(", ") || "cualquiera"}.${isPlanQuery ? ' IMPORTANTE: Todas las recomendaciones de platillos DEBEN respetar estas preferencias dietéticas. No sugieras platillos que contradigan la dieta del usuario.' : ''}`)
     : (language === 'en' ? "New user — suggest representative variety." : "Usuario nuevo — sugiere variedad representativa.");
 
   // Tag logic

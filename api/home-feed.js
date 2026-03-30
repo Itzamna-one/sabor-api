@@ -79,8 +79,11 @@ function getCityGeo(city) {
 // ─── Google Places enrichment (with geo-bias) ───
 async function getPlaceDetails(name, city, apiKey) {
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout
     const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': apiKey,
@@ -98,6 +101,7 @@ async function getPlaceDetails(name, city, apiKey) {
       }),
     });
 
+    clearTimeout(timeout);
     const data = await response.json();
     const place = data.places?.[0];
     if (!place) return null;

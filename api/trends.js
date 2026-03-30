@@ -33,7 +33,7 @@ async function getGoogleTrends(keyword, geo = 'US-IL-602') {
     const url = `https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-360&geo=${geo}&ns=15`;
     const resp = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0' }
-    }).timeout ? await fetch(url) : await fetch(url);
+    });
     
     if (!resp.ok) return null;
     

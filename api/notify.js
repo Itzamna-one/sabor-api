@@ -97,11 +97,15 @@ export default async function handler(req, res) {
     });
 
     if (failedTokens.length > 0) {
+      // Firestore 'in' query limit is 10 — process in chunks
       const batch = db.batch();
-      const tokenDocs = await db.collection('fcm_tokens')
-        .where('token', 'in', failedTokens.slice(0, 10)) // Firestore 'in' limit is 10
-        .get();
-      tokenDocs.forEach(doc => batch.delete(doc.ref));
+      for (let i = 0; i < failedTokens.length; i += 10) {
+        const chunk = failedTokens.slice(i, i + 10);
+        const tokenDocs = await db.collection('fcm_tokens')
+          .where('token', 'in', chunk)
+          .get();
+        tokenDocs.forEach(doc => batch.delete(doc.ref));
+      }
       await batch.commit();
     }
 
