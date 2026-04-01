@@ -84,6 +84,7 @@ function getSearchQueries(dayOfWeek) {
 }
 
 // ── EVENTBRITE API SEARCH ──
+// Returns { events: [], status: number, error: string|null }
 async function searchEventbrite(query, coords, token) {
   try {
     const url = `https://www.eventbriteapi.com/v3/events/search/?q=${encodeURIComponent(query)}&location.latitude=${coords.lat}&location.longitude=${coords.lng}&location.within=30mi&expand=venue&sort_by=date&page_size=10`;
@@ -92,27 +93,25 @@ async function searchEventbrite(query, coords, token) {
       signal: AbortSignal.timeout(8000),
     });
     if (!resp.ok) {
-      if (resp.status === 429) {
-        console.warn(`Rate limited on query: ${query}`);
-        return [];
-      }
-      console.error(`Eventbrite search "${query}": ${resp.status}`);
-      return [];
+      const body = await resp.text().catch(() => '');
+      console.error(`Eventbrite "${query}": ${resp.status} — ${body.substring(0, 200)}`);
+      return { events: [], status: resp.status, error: body.substring(0, 200) };
     }
     const data = await resp.json();
-    return data?.events || [];
+    return { events: data?.events || [], status: 200, error: null };
   } catch (err) {
     console.error(`Eventbrite search failed "${query}":`, err.message);
-    return [];
+    return { events: [], status: 0, error: err.message };
   }
 }
 
 // ── COLLECT RAW EVENTS ──
+// Returns { events: [], debug: {} }
 async function collectEvents(city) {
   const token = process.env.EVENTBRITE_API_TOKEN;
   if (!token) {
     console.error('EVENTBRITE_API_TOKEN not set');
-    return [];
+    return { events: [], debug: { error: 'EVENTBRITE_API_TOKEN not set' } };
   }
 
   const cityName = city.split(',')[0].trim().toLowerCase();
@@ -124,12 +123,16 @@ async function collectEvents(city) {
 
   // Run searches in batches of 3 to respect rate limits
   const allEvents = [];
+  const errors = [];
   for (let i = 0; i < queries.length; i += 3) {
     const batch = queries.slice(i, i + 3);
     const results = await Promise.all(
       batch.map(q => searchEventbrite(q, coords, token))
     );
-    allEvents.push(...results.flat());
+    for (const r of results) {
+      allEvents.push(...r.events);
+      if (r.error) errors.push({ status: r.status, error: r.error });
+    }
 
     // Small delay between batches to avoid rate limits
     if (i + 3 < queries.length) {
@@ -146,7 +149,16 @@ async function collectEvents(city) {
   });
 
   console.log(`🌐 ${allEvents.length} total results → ${unique.length} unique events`);
-  return unique;
+  return {
+    events: unique,
+    debug: {
+      tokenPrefix: token.substring(0, 8) + '...',
+      queries: queries.length,
+      totalResults: allEvents.length,
+      uniqueResults: unique.length,
+      errors: errors.slice(0, 3), // first 3 errors
+    },
+  };
 }
 
 // ── FORMAT FOR CLAUDE ──
@@ -366,7 +378,7 @@ export default async function handler(req, res) {
 
   try {
     // Step 1: Collect raw events from Eventbrite
-    const rawEvents = await collectEvents(city);
+    const { events: rawEvents, debug } = await collectEvents(city);
 
     if (rawEvents.length === 0) {
       const cleaned = await cleanupExpired();
@@ -374,7 +386,8 @@ export default async function handler(req, res) {
         success: true, city,
         searched: 10, collected: 0, enriched: 0, stored: 0, cleaned,
         events: [],
-        note: 'No events found from Eventbrite — check API token',
+        debug, // <-- shows token prefix, errors, etc.
+        note: 'No events found from Eventbrite',
       });
     }
 
