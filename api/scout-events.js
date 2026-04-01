@@ -148,133 +148,175 @@ function formatTicketmasterForClaude(tmEvents, city) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// SOURCE 2: RESY EXPERIENCES
-// Fetches the public experiences page and extracts HTML content.
+// SOURCE 2: RESY — Search for venues with availability/experiences
+// Uses the internal Resy API (public key from their website)
 // ══════════════════════════════════════════════════════════════════
 async function collectResy(city) {
   const cityName = city.split(',')[0].trim().toLowerCase();
   const meta = CITY_META[cityName];
-  if (!meta?.resySlug) return { text: null, error: `No Resy slug for ${cityName}` };
+  if (!meta) return { venues: [], error: `No Resy config for ${cityName}` };
 
-  try {
-    // Resy experiences page
-    const url = `https://resy.com/cities/${meta.resySlug}`;
-    const resp = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-      },
-      signal: AbortSignal.timeout(10000),
-    });
+  const queries = ['tasting menu', 'prix fixe', 'happy hour', 'chef', 'brunch', 'omakase', 'cocktail', 'wine dinner'];
+  const allVenues = [];
+  const errors = [];
 
-    if (!resp.ok) return { text: null, error: `Resy ${resp.status}` };
-    const html = await resp.text();
+  // Run queries in batches of 4
+  for (let i = 0; i < queries.length; i += 4) {
+    const batch = queries.slice(i, i + 4);
+    const results = await Promise.all(batch.map(async (query) => {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const url = `https://api.resy.com/4/find?lat=${meta.lat}&long=${meta.lng}&day=${today}&party_size=2&query=${encodeURIComponent(query)}`;
+        const resp = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Authorization': 'ResyAPI api_key="VbWk7s3L4KiK5fzlO7JD3Q5EYolJI7n5"',
+            'Accept': 'application/json',
+            'Origin': 'https://resy.com',
+            'Referer': 'https://resy.com/',
+          },
+          signal: AbortSignal.timeout(6000),
+        });
+        if (!resp.ok) return { venues: [], error: `${resp.status} for "${query}"` };
+        const data = await resp.json();
+        const results = data?.results || [];
+        return {
+          venues: results.map(r => ({
+            source: 'resy',
+            name: r.venue?.name || '',
+            cuisine: r.venue?.cuisine || [],
+            neighborhood: r.venue?.neighborhood || '',
+            price: r.venue?.price_range || 0,
+            rating: r.venue?.rating || null,
+            tagline: r.venue?.tagline || '',
+            slug: r.venue?.url_slug || '',
+            query,
+          })),
+          error: null,
+        };
+      } catch (err) {
+        return { venues: [], error: `"${query}": ${err.message}` };
+      }
+    }));
 
-    // Extract text — strip scripts/styles, keep structure
-    const text = html
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<!--[\s\S]*?-->/g, '')
-      .replace(/<a[^>]*href="([^"]*)"[^>]*>/gi, ' [LINK:$1] ')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
-      .replace(/\n{3,}/g, '\n\n').replace(/ {2,}/g, ' ')
-      .trim();
-
-    // Take relevant portion (skip if too short — means JS-rendered)
-    if (text.length < 500) return { text: null, error: 'Resy page too short (likely JS-rendered)' };
-    return { text: text.substring(0, 15000), error: null };
-  } catch (err) {
-    return { text: null, error: `Resy: ${err.message}` };
+    for (const r of results) {
+      allVenues.push(...r.venues);
+      if (r.error) errors.push(r.error);
+    }
+    if (i + 4 < queries.length) await new Promise(r => setTimeout(r, 300));
   }
+
+  // Deduplicate by venue name
+  const seen = new Set();
+  const unique = allVenues.filter(v => {
+    const key = v.name.toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return { venues: unique, errors };
 }
 
-// Also try Resy's internal API for venue events
-async function collectResyAPI(city) {
-  const cityName = city.split(',')[0].trim().toLowerCase();
-  const meta = CITY_META[cityName];
-  if (!meta) return { events: [], error: `No Resy config for ${cityName}` };
+// ══════════════════════════════════════════════════════════════════
+// SOURCE 3: YELP EVENTS API
+// Official Yelp Fusion events endpoint with food-and-drink filter
+// ══════════════════════════════════════════════════════════════════
+async function collectYelpEvents(city) {
+  const yelpKey = process.env.YELP_API_KEY;
+  if (!yelpKey) return { events: [], error: 'YELP_API_KEY not set' };
 
-  try {
-    // Resy has a public API endpoint for venue listings
-    const url = `https://api.resy.com/3/venuesearch/search?geo=${meta.lat},${meta.lng}&limit=20&query=experience&type=venue`;
-    const resp = await fetch(url, {
-      headers: {
-        'Authorization': 'ResyAPI api_key="VbWk7s3L4KiK5fzlO7JD3Q5EYolJI7n5"',
-        'Accept': 'application/json',
-        'Origin': 'https://resy.com',
-        'Referer': 'https://resy.com/',
-      },
-      signal: AbortSignal.timeout(8000),
-    });
+  const cityName = city.split(',')[0].trim();
+  const allEvents = [];
+  const errors = [];
 
-    if (!resp.ok) return { events: [], error: `Resy API ${resp.status}` };
-    const data = await resp.json();
-    const venues = data?.results?.venues || [];
+  // Food & drink category + general events with food keywords
+  const searches = [
+    { categories: 'food-and-drink', limit: 20 },
+    { categories: 'nightlife', limit: 10 },
+    { categories: 'festivals-fairs', limit: 10 },
+  ];
+
+  for (const search of searches) {
+    try {
+      const params = new URLSearchParams({
+        location: cityName,
+        categories: search.categories,
+        limit: String(search.limit),
+        sort_on: 'time_start',
+        sort_by: 'asc',
+        start_date: Math.floor(Date.now() / 1000),
+      });
+      const url = `https://api.yelp.com/v3/events?${params}`;
+      const resp = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${yelpKey}` },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!resp.ok) {
+        errors.push(`Yelp ${search.categories}: ${resp.status}`);
+        continue;
+      }
+      const data = await resp.json();
+      allEvents.push(...(data?.events || []));
+    } catch (err) {
+      errors.push(`Yelp ${search.categories}: ${err.message}`);
+    }
+  }
+
+  // Deduplicate
+  const seen = new Set();
+  const unique = allEvents.filter(e => {
+    if (seen.has(e.id)) return false;
+    seen.add(e.id);
+    return true;
+  });
+
+  return { events: unique, errors };
+}
+
+function formatYelpForClaude(yelpEvents) {
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  return yelpEvents.map(e => {
+    let dateStr = '', timeStr = '';
+    if (e.time_start) {
+      const d = new Date(e.time_start);
+      dateStr = `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+      const h = d.getHours();
+      const m = String(d.getMinutes()).padStart(2, '0');
+      timeStr = `${h === 0 ? 12 : h > 12 ? h - 12 : h}:${m} ${h >= 12 ? 'PM' : 'AM'}`;
+      if (e.time_end) {
+        const end = new Date(e.time_end);
+        const eh = end.getHours();
+        const em = String(end.getMinutes()).padStart(2, '0');
+        timeStr += ` - ${eh === 0 ? 12 : eh > 12 ? eh - 12 : eh}:${em} ${eh >= 12 ? 'PM' : 'AM'}`;
+      }
+    }
 
     return {
-      events: venues.map(v => ({
-        source: 'resy',
-        title: v.name || '',
-        description: v.tagline || v.cuisine || '',
-        venue: v.name || '',
-        neighborhood: v.neighborhood || '',
-        city: cityName,
-        price: v.price_range_display || 'See venue',
-        url: `https://resy.com/cities/${meta.resySlug}/${v.url_slug || ''}`,
-        rating: v.rating || null,
-      })),
-      error: null,
+      source: 'yelp',
+      title: e.name || '',
+      description: (e.description || '').substring(0, 300),
+      venue: e.business_id || e.location?.display_address?.join(', ') || 'See event',
+      address: e.location?.display_address?.join(', ') || '',
+      city: e.location?.city || '',
+      date: dateStr,
+      time: timeStr,
+      price: e.cost_max ? `$${e.cost}–$${e.cost_max}` : e.cost ? `$${e.cost}` : (e.is_free ? 'Free' : 'See event'),
+      url: e.event_site_url || '',
+      image: e.image_url || null,
+      attending: e.attending_count || 0,
+      interested: e.interested_count || 0,
+      category: e.category || '',
     };
-  } catch (err) {
-    return { events: [], error: `Resy API: ${err.message}` };
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════
-// SOURCE 3: OPENTABLE EXPERIENCES
-// Fetches the public experiences/specials page for the metro.
-// ══════════════════════════════════════════════════════════════════
-async function collectOpenTable(city) {
-  const cityName = city.split(',')[0].trim().toLowerCase();
-  const meta = CITY_META[cityName];
-  if (!meta?.openTableMetro) return { text: null, error: `No OpenTable metro for ${cityName}` };
-
-  try {
-    // OpenTable experiences page (metro 3 = Chicago)
-    const url = `https://www.opentable.com/experiences/${meta.openTableMetro}`;
-    const resp = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-      },
-      signal: AbortSignal.timeout(10000),
-    });
-
-    if (!resp.ok) return { text: null, error: `OpenTable ${resp.status}` };
-    const html = await resp.text();
-
-    const text = html
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<!--[\s\S]*?-->/g, '')
-      .replace(/<a[^>]*href="([^"]*)"[^>]*>/gi, ' [LINK:$1] ')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
-      .replace(/\n{3,}/g, '\n\n').replace(/ {2,}/g, ' ')
-      .trim();
-
-    if (text.length < 500) return { text: null, error: 'OpenTable page too short (likely JS-rendered)' };
-    return { text: text.substring(0, 15000), error: null };
-  } catch (err) {
-    return { text: null, error: `OpenTable: ${err.message}` };
-  }
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════
 // CLAUDE ENRICHMENT — processes all sources together
 // ══════════════════════════════════════════════════════════════════
-async function enrichAllEvents(tmFormatted, resyText, resyVenues, openTableText, city) {
+async function enrichAllEvents(tmFormatted, resyVenues, yelpFormatted, city) {
   const cityName = city.split(',')[0].trim();
   const today = new Date().toISOString().split('T')[0];
   const allEnriched = [];
@@ -320,37 +362,39 @@ Return [] if nothing qualifies.`;
     }
   }
 
-  // ── PASS 2: Resy + OpenTable (unstructured HTML text + venue data) ──
-  const webSources = [];
-  if (resyText) webSources.push(`=== RESY EXPERIENCES (${cityName}) ===\n${resyText}`);
+  // ── PASS 2: Resy venues + Yelp events — high-end dining experiences ──
+  const extraSources = [];
   if (resyVenues.length > 0) {
-    webSources.push(`=== RESY VENUES WITH EXPERIENCES ===\n${JSON.stringify(resyVenues.slice(0, 15), null, 2)}`);
+    extraSources.push(`=== RESY HIGH-END VENUES (${cityName}) ===\nThese are restaurants on Resy with availability. Create events for their notable dining experiences.\n${JSON.stringify(resyVenues.slice(0, 20), null, 2)}`);
   }
-  if (openTableText) webSources.push(`=== OPENTABLE EXPERIENCES (${cityName}) ===\n${openTableText}`);
+  if (yelpFormatted.length > 0) {
+    extraSources.push(`=== YELP FOOD & DRINK EVENTS (${cityName}) ===\n${JSON.stringify(yelpFormatted, null, 2)}`);
+  }
 
-  if (webSources.length > 0) {
-    const webPrompt = `You are a food event curator for SABOR, a food discovery app in ${cityName}. Today is ${today}.
+  if (extraSources.length > 0) {
+    const extraPrompt = `You are a food event curator for SABOR, a food discovery app in ${cityName}. Today is ${today}.
 
-I've scraped Resy and/or OpenTable for dining experiences, special menus, happy hours, and events. Extract REAL food & drink experiences that users can actually attend or book.
+I have data from Resy (upscale restaurant venues) and/or Yelp (food & drink events). Create curated SABOR picks from this data.
 
-PRIORITIZE HIGH-END & UNIQUE:
-- Prix fixe & tasting menus at upscale restaurants
-- Chef's table experiences, omakase, chef collaborations
-- Wine/cocktail pairing dinners
-- Rooftop dining events, seasonal specials
-- Happy hours at notable restaurants and bars
-- Themed dinner experiences (supper clubs, pop-ups)
-- Bottomless brunch specials
-- Distillery/brewery/winery tastings
-- Special holiday or seasonal menus
+FOR RESY VENUES — turn them into bookable dining experiences:
+- Create entries for their tasting menus, omakase, chef's tables, prix fixe, happy hours
+- Use the venue name, cuisine, neighborhood, and price range to craft a compelling description
+- Date should be "Ongoing" for these since they're regular offerings
+- Include the Resy booking URL
+- ONLY include venues that clearly offer a special dining experience (not just any restaurant)
 
-EXCLUDE: Generic restaurant listings with no special event or experience, closed/past events.
+FOR YELP EVENTS — curate the best food & drink events:
+- Happy hours, wine tastings, food festivals, cooking classes, pop-ups
+- Include date, time, price, and venue details
+- Skip anything that's not genuinely food/drink focused
 
-SCRAPED CONTENT:
-${webSources.join('\n\n')}
+PRIORITIZE: High-end experiences, unique culinary events, craft cocktail tastings, chef collaborations, seasonal menus, upscale happy hours.
+
+DATA:
+${extraSources.join('\n\n')}
 
 Respond ONLY with a valid JSON array (no markdown, no backticks):
-[{"title":"experience name","description":"1-2 sentences with specific food/drink details and what makes it special","venue":"restaurant/bar name","neighborhood":"area in ${cityName}","date":"Ongoing" or "Day, Month Date" if specific,"time":"typical hours or specific time","price":"$XX" or "$$$$" tier or "See venue","category":"tasting|brunch|happy_hour|pop_up|special|class","vibe":"Tasting|Brunch|Happy Hour|Pop-Up|Chef's Table|Food Event","url":"booking/info URL if found","image":null,"tags":["upscale","relevant","tags"],"confidence":"high|medium"}]
+[{"title":"experience/event name","description":"1-2 sentences highlighting what makes it special","venue":"restaurant/bar name","neighborhood":"area in ${cityName}","date":"Ongoing" or "Day, Month Date","time":"hours or specific time","price":"$XX or $$$ tier or See venue","category":"tasting|brunch|happy_hour|pop_up|special|class","vibe":"Tasting|Brunch|Happy Hour|Pop-Up|Chef's Table|Food Event","url":"booking URL","image":null,"tags":["upscale","relevant","tags"],"confidence":"high|medium"}]
 
 Return [] if nothing qualifies.`;
 
@@ -358,16 +402,16 @@ Return [] if nothing qualifies.`;
       const msg = await claude.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 4000,
-        messages: [{ role: 'user', content: webPrompt }],
+        messages: [{ role: 'user', content: extraPrompt }],
       });
       const raw = msg.content[0]?.text || '[]';
       let cleaned = raw.trim();
       if (cleaned.startsWith('```')) cleaned = cleaned.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
-      const webEvents = JSON.parse(cleaned);
-      console.log(`🍷 Claude extracted ${webEvents.length} events from Resy/OpenTable`);
-      allEnriched.push(...webEvents);
+      const extraEvents = JSON.parse(cleaned);
+      console.log(`🍷 Claude extracted ${extraEvents.length} events from Resy/Yelp`);
+      allEnriched.push(...extraEvents);
     } catch (err) {
-      console.error('Claude web enrichment failed:', err.message);
+      console.error('Claude Resy/Yelp enrichment failed:', err.message);
     }
   }
 
@@ -489,38 +533,33 @@ export default async function handler(req, res) {
 
   try {
     // Step 1: Collect from ALL sources in parallel
-    const [tmResult, resyPage, resyAPI, otPage] = await Promise.all([
+    const [tmResult, resyResult, yelpResult] = await Promise.all([
       collectTicketmaster(city),
       collectResy(city),
-      collectResyAPI(city),
-      collectOpenTable(city),
+      collectYelpEvents(city),
     ]);
 
     const tmEvents = tmResult.events;
+    const resyVenues = resyResult.venues || [];
+    const yelpEvents = yelpResult.events || [];
+
     const sourceDebug = {
       ticketmaster: { count: tmEvents.length, errors: tmResult.errors.slice(0, 3) },
-      resy: {
-        pageLength: resyPage.text?.length || 0,
-        apiVenues: resyAPI.events?.length || 0,
-        errors: [resyPage.error, resyAPI.error].filter(Boolean),
-      },
-      openTable: {
-        pageLength: otPage.text?.length || 0,
-        error: otPage.error,
-      },
+      resy: { venues: resyVenues.length, errors: resyResult.errors?.slice(0, 3) || [] },
+      yelp: { events: yelpEvents.length, errors: yelpResult.errors?.slice(0, 3) || [] },
     };
 
-    console.log(`📊 TM: ${tmEvents.length} | Resy page: ${resyPage.text?.length || 0} chars, API: ${resyAPI.events?.length || 0} venues | OT: ${otPage.text?.length || 0} chars`);
+    console.log(`📊 TM: ${tmEvents.length} | Resy: ${resyVenues.length} venues | Yelp: ${yelpEvents.length} events`);
 
-    // Step 2: Format Ticketmaster events for Claude
+    // Step 2: Format for Claude
     const tmFormatted = formatTicketmasterForClaude(tmEvents, city);
+    const yelpFormatted = formatYelpForClaude(yelpEvents);
 
-    // Step 3: Claude enrichment — all sources in one pass
+    // Step 3: Claude enrichment — all sources
     const enriched = await enrichAllEvents(
       tmFormatted,
-      resyPage.text,
-      resyAPI.events || [],
-      otPage.text,
+      resyVenues,
+      yelpFormatted,
       city,
     );
 
