@@ -27,6 +27,9 @@
     },
     "api/scout-events.js": {
       "maxDuration": 60
+    },
+    "api/submit-event.js": {
+      "maxDuration": 15
     }
   },
   "headers": [
