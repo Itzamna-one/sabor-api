@@ -1,6 +1,6 @@
-// api/events.js — Real events via Ticketmaster + Eventbrite + SABOR Scout
-// No curated/fake events — only verified, real events users can actually attend.
-// SABOR Scout events are AI-scouted from the web and stored in Firestore.
+// api/events.js — Real events via Ticketmaster + SABOR Scout (Firestore)
+// SABOR Scout events are AI-curated food events stored by scout-events.js.
+// Eventbrite search API deprecated (404) — removed.
 
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -11,118 +11,6 @@ if (!getApps().length) {
   initializeApp({ credential: cert(serviceAccount) });
 }
 const db = getFirestore();
-
-// City → lat/lng for Eventbrite location search
-const CITY_COORDS = {
-  'chicago':       { lat: 41.8781, lng: -87.6298 },
-  'indianapolis':  { lat: 39.7684, lng: -86.1581 },
-  'aurora':        { lat: 41.7606, lng: -88.3201 },
-  'naperville':    { lat: 41.7508, lng: -88.1535 },
-  'joliet':        { lat: 41.5250, lng: -88.0817 },
-  'rockford':      { lat: 42.2711, lng: -89.0940 },
-  'springfield':   { lat: 39.7817, lng: -89.6501 },
-  'gary':          { lat: 41.5934, lng: -87.3465 },
-  'fort wayne':    { lat: 41.0793, lng: -85.1394 },
-  'south bend':    { lat: 41.6764, lng: -86.2520 },
-  'bloomington':   { lat: 39.1653, lng: -86.5264 },
-};
-
-// ── EVENTBRITE API ──
-async function fetchEventbriteEvents(city) {
-  const token = process.env.EVENTBRITE_API_TOKEN;
-  if (!token) return [];
-
-  try {
-    const cityName = city.split(',')[0].trim().toLowerCase();
-    const coords = CITY_COORDS[cityName] || CITY_COORDS['chicago'];
-
-    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-
-    // Search food-related events within 25 miles
-    const searches = [
-      'food+festival', 'taco', 'tasting+dinner', 'food+truck',
-      'night+market', 'cooking+class', 'brunch', 'pop+up+restaurant',
-    ];
-
-    // Run 2 parallel searches (to stay within rate limits)
-    const fetches = [
-      (async () => {
-        try {
-          const url = `https://www.eventbriteapi.com/v3/events/search/?q=${searches.slice(0, 4).join('+')}&location.latitude=${coords.lat}&location.longitude=${coords.lng}&location.within=25mi&expand=venue&sort_by=date&page_size=12`;
-          const resp = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${token}` },
-            signal: AbortSignal.timeout(6000),
-          });
-          if (!resp.ok) { console.error('Eventbrite search 1:', resp.status); return []; }
-          const data = await resp.json();
-          return data?.events || [];
-        } catch { return []; }
-      })(),
-      (async () => {
-        try {
-          const url = `https://www.eventbriteapi.com/v3/events/search/?q=${searches.slice(4).join('+')}&location.latitude=${coords.lat}&location.longitude=${coords.lng}&location.within=25mi&expand=venue&sort_by=date&page_size=8`;
-          const resp = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${token}` },
-            signal: AbortSignal.timeout(6000),
-          });
-          if (!resp.ok) { console.error('Eventbrite search 2:', resp.status); return []; }
-          const data = await resp.json();
-          return data?.events || [];
-        } catch { return []; }
-      })(),
-    ];
-
-    const allResults = (await Promise.all(fetches)).flat();
-    const seen = new Set();
-    const events = allResults.filter(e => {
-      if (seen.has(e.id)) return false;
-      seen.add(e.id);
-      return true;
-    }).slice(0, 12);
-
-    return events.map(e => {
-      const venueName = e.venue?.name || 'TBA';
-      const venueCity = e.venue?.address?.city || city.split(',')[0].trim();
-      const startUtc = e.start?.local || '';
-      const eventDate = startUtc ? new Date(startUtc) : new Date();
-      const dateStr = `${days[eventDate.getDay()]}, ${months[eventDate.getMonth()]} ${eventDate.getDate()}`;
-      const hour = eventDate.getHours();
-      const min = String(eventDate.getMinutes()).padStart(2, '0');
-      const timeStr = startUtc ? `${hour === 0 ? 12 : hour > 12 ? hour - 12 : hour}:${min} ${hour >= 12 ? 'PM' : 'AM'}` : '';
-
-      const isFree = e.is_free || false;
-      const img = e.logo?.url || null;
-      const titleLower = (e.name?.text || '').toLowerCase();
-      const isFoodEvent = /food|brunch|dinner|tasting|culinary|chef|bbq|taco|pizza|wine|beer|cocktail|market|pop.?up|cooking/.test(titleLower);
-
-      return {
-        id: `eb_${e.id}`,
-        title: e.name?.text || 'Event',
-        description: (e.description?.text || e.summary || '').substring(0, 200),
-        venue: venueName,
-        neighborhood: venueCity,
-        city,
-        date: dateStr,
-        time: timeStr,
-        price: isFree ? 'Free' : 'See event',
-        priceNum: 0,
-        category: isFoodEvent ? 'food' : 'live',
-        vibe: isFoodEvent ? 'Food Event' : 'Experience',
-        emoji: isFoodEvent ? '🍽️' : '🎫',
-        image: img,
-        premiumOnly: false,
-        earlyAccess: false,
-        tags: ['live', 'eventbrite', ...(isFoodEvent ? ['food'] : [])],
-        source: 'Eventbrite',
-        url: e.url || null,
-      };
-    });
-  } catch (err) {
-    console.error('Eventbrite fetch error:', err.message);
-    return [];
-  }
-}
 
 // ── TICKETMASTER API ──
 async function fetchTicketmasterEvents(city) {
@@ -308,17 +196,16 @@ export default async function handler(req, res) {
 
   const { city = 'Chicago, IL', category, budget } = req.query;
 
-  // Fetch from all 3 sources in parallel
-  const [tmEvents, ebEvents, saborEvents] = await Promise.all([
+  // Fetch from Ticketmaster + SABOR Scout (Firestore) in parallel
+  // Note: Eventbrite search API was deprecated (404) — removed
+  const [tmEvents, saborEvents] = await Promise.all([
     fetchTicketmasterEvents(city).catch(err => { console.error('TM failed:', err.message); return []; }),
-    fetchEventbriteEvents(city).catch(err => { console.error('EB failed:', err.message); return []; }),
     fetchScoutedEvents(city).catch(err => { console.error('Scout failed:', err.message); return []; }),
   ]);
 
-  // Merge and deduplicate (by title similarity — same event listed on multiple platforms)
-  // SABOR scouted events go first so they win dedup conflicts
+  // Merge and deduplicate — SABOR scouted events first so they win dedup
   const seen = new Set();
-  let events = [...saborEvents, ...ebEvents, ...tmEvents].filter(e => {
+  let events = [...saborEvents, ...tmEvents].filter(e => {
     const key = e.title.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 30);
     if (seen.has(key)) return false;
     seen.add(key);
@@ -360,6 +247,6 @@ export default async function handler(req, res) {
   return res.status(200).json({
     events,
     total: events.length,
-    sources: { sabor: saborEvents.length, ticketmaster: tmEvents.length, eventbrite: ebEvents.length },
+    sources: { sabor: saborEvents.length, ticketmaster: tmEvents.length },
   });
 }
