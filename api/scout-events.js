@@ -1,6 +1,6 @@
 // api/scout-events.js — AI Event Scout
-// Uses Ticketmaster Discovery API with deep food-specific searches
-// + Claude Haiku to curate the best food & drink events as SABOR picks.
+// Sources: Ticketmaster API + Resy Experiences + OpenTable Experiences
+// Claude Haiku curates the best food & drink events as SABOR picks.
 // Stores in Firestore for the SABOR events feed.
 //
 // Triggered by:
@@ -19,7 +19,23 @@ if (!getApps().length) {
 const db = getFirestore();
 const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// ── TICKETMASTER SEARCH ──
+// ── CITY CONFIG ──
+const CITY_META = {
+  'chicago': {
+    resySlug: 'chi',
+    openTableMetro: '3',
+    lat: 41.8781, lng: -87.6298,
+  },
+  'indianapolis': {
+    resySlug: 'ind',
+    openTableMetro: '197',
+    lat: 39.7684, lng: -86.1581,
+  },
+};
+
+// ══════════════════════════════════════════════════════════════════
+// SOURCE 1: TICKETMASTER
+// ══════════════════════════════════════════════════════════════════
 async function searchTicketmaster(keyword, city, apiKey, opts = {}) {
   try {
     const cityName = city.split(',')[0].trim();
@@ -28,16 +44,12 @@ async function searchTicketmaster(keyword, city, apiKey, opts = {}) {
     const endDate = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('.')[0] + 'Z';
 
     let url = `https://app.ticketmaster.com/discovery/v2/events.json?keyword=${encodeURIComponent(keyword)}&city=${encodeURIComponent(cityName)}&startDateTime=${startDate}&endDateTime=${endDate}&size=${opts.size || 15}&sort=date,asc&apikey=${apiKey}`;
-
     if (opts.classificationName) {
       url += `&classificationName=${encodeURIComponent(opts.classificationName)}`;
     }
 
     const resp = await fetch(url, { signal: AbortSignal.timeout(6000) });
-    if (!resp.ok) {
-      if (resp.status === 429) return { events: [], error: 'rate limited' };
-      return { events: [], error: `${resp.status}` };
-    }
+    if (!resp.ok) return { events: [], error: `TM ${resp.status}` };
     const data = await resp.json();
     return { events: data?._embedded?.events || [], error: null };
   } catch (err) {
@@ -45,46 +57,34 @@ async function searchTicketmaster(keyword, city, apiKey, opts = {}) {
   }
 }
 
-// ── COLLECT RAW EVENTS ──
-async function collectEvents(city) {
+async function collectTicketmaster(city) {
   const apiKey = process.env.TICKETMASTER_API_KEY;
-  if (!apiKey) {
-    return { events: [], debug: { error: 'TICKETMASTER_API_KEY not set' } };
-  }
+  if (!apiKey) return { events: [], errors: ['TICKETMASTER_API_KEY not set'] };
 
-  // Deep food & drink search queries — way more specific than events.js
   const foodQueries = [
-    { keyword: 'food festival', size: 15 },
-    { keyword: 'food truck', size: 10 },
-    { keyword: 'tasting dinner', size: 10 },
-    { keyword: 'wine tasting', size: 10 },
-    { keyword: 'beer festival', size: 10 },
-    { keyword: 'brunch', size: 10 },
-    { keyword: 'cooking class', size: 8 },
-    { keyword: 'taco', size: 8 },
-    { keyword: 'bbq barbecue', size: 8 },
-    { keyword: 'cocktail', size: 8 },
-    { keyword: 'chef dinner', size: 8 },
-    { keyword: 'night market', size: 8 },
-    { keyword: 'happy hour', size: 8 },
-    { keyword: 'pizza', size: 8 },
-    { keyword: 'seafood', size: 8 },
-    { keyword: 'latin food mexican', size: 8 },
+    { keyword: 'food festival', size: 12 },
+    { keyword: 'food truck', size: 8 },
+    { keyword: 'wine tasting', size: 8 },
+    { keyword: 'beer festival', size: 8 },
+    { keyword: 'brunch', size: 8 },
+    { keyword: 'cooking class', size: 6 },
+    { keyword: 'taco', size: 6 },
+    { keyword: 'bbq barbecue', size: 6 },
+    { keyword: 'cocktail', size: 6 },
+    { keyword: 'happy hour', size: 6 },
+    { keyword: 'chef dinner', size: 6 },
+    { keyword: 'latin food mexican', size: 6 },
+    { keyword: 'prix fixe', size: 6 },
+    { keyword: 'supper club', size: 6 },
+    { keyword: 'distillery tasting', size: 6 },
+    { keyword: 'night market', size: 6 },
   ];
 
-  // Also search broad categories that pair with food plans
-  const broadQueries = [
-    { keyword: 'festival', classificationName: 'miscellaneous', size: 10 },
-    { keyword: 'food', classificationName: 'arts', size: 8 },
-  ];
-
-  const allQueries = [...foodQueries, ...broadQueries];
   const errors = [];
   const allEvents = [];
 
-  // Run in batches of 4 (TM allows ~5 req/sec)
-  for (let i = 0; i < allQueries.length; i += 4) {
-    const batch = allQueries.slice(i, i + 4);
+  for (let i = 0; i < foodQueries.length; i += 4) {
+    const batch = foodQueries.slice(i, i + 4);
     const results = await Promise.all(
       batch.map(q => searchTicketmaster(q.keyword, city, apiKey, q))
     );
@@ -92,10 +92,7 @@ async function collectEvents(city) {
       allEvents.push(...r.events);
       if (r.error) errors.push(r.error);
     }
-    // Small delay between batches
-    if (i + 4 < allQueries.length) {
-      await new Promise(r => setTimeout(r, 300));
-    }
+    if (i + 4 < foodQueries.length) await new Promise(r => setTimeout(r, 300));
   }
 
   // Deduplicate by event ID
@@ -106,20 +103,10 @@ async function collectEvents(city) {
     return true;
   });
 
-  console.log(`🌐 ${allEvents.length} total → ${unique.length} unique events`);
-  return {
-    events: unique,
-    debug: {
-      queries: allQueries.length,
-      totalResults: allEvents.length,
-      uniqueResults: unique.length,
-      errors: errors.slice(0, 3),
-    },
-  };
+  return { events: unique, errors };
 }
 
-// ── FORMAT FOR CLAUDE ──
-function formatForClaude(tmEvents, city) {
+function formatTicketmasterForClaude(tmEvents, city) {
   const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -133,8 +120,7 @@ function formatForClaude(tmEvents, city) {
       ? (priceMax && priceMax !== priceMin ? `$${priceMin}-$${priceMax}` : `$${priceMin}`)
       : 'See event';
 
-    let dateStr = '';
-    let timeStr = '';
+    let dateStr = '', timeStr = '';
     if (startLocal) {
       const d = new Date(startLocal + 'T' + (startTime || '00:00:00'));
       dateStr = `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
@@ -145,111 +131,247 @@ function formatForClaude(tmEvents, city) {
       }
     }
 
-    const classification = e.classifications?.[0] || {};
-    const segment = classification.segment?.name || '';
-    const genre = classification.genre?.name || '';
-    const subGenre = classification.subGenre?.name || '';
-
     return {
+      source: 'ticketmaster',
       title: e.name || '',
       description: (e.info || e.pleaseNote || '').substring(0, 300),
       venue: venue.name || 'TBA',
       address: venue.address?.line1 || '',
       city: venue.city?.name || city.split(',')[0].trim(),
-      state: venue.state?.stateCode || '',
       date: dateStr,
       time: timeStr,
       price: priceStr,
-      segment, genre, subGenre,
       url: e.url || '',
       image: e.images?.find(img => img.width >= 300)?.url || null,
     };
   });
 }
 
-// ── CLAUDE ENRICHMENT ──
-async function enrichEvents(formattedEvents, city) {
-  if (!formattedEvents.length) return [];
+// ══════════════════════════════════════════════════════════════════
+// SOURCE 2: RESY EXPERIENCES
+// Fetches the public experiences page and extracts HTML content.
+// ══════════════════════════════════════════════════════════════════
+async function collectResy(city) {
+  const cityName = city.split(',')[0].trim().toLowerCase();
+  const meta = CITY_META[cityName];
+  if (!meta?.resySlug) return { text: null, error: `No Resy slug for ${cityName}` };
 
+  try {
+    // Resy experiences page
+    const url = `https://resy.com/cities/${meta.resySlug}`;
+    const resp = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!resp.ok) return { text: null, error: `Resy ${resp.status}` };
+    const html = await resp.text();
+
+    // Extract text — strip scripts/styles, keep structure
+    const text = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<a[^>]*href="([^"]*)"[^>]*>/gi, ' [LINK:$1] ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+      .replace(/\n{3,}/g, '\n\n').replace(/ {2,}/g, ' ')
+      .trim();
+
+    // Take relevant portion (skip if too short — means JS-rendered)
+    if (text.length < 500) return { text: null, error: 'Resy page too short (likely JS-rendered)' };
+    return { text: text.substring(0, 15000), error: null };
+  } catch (err) {
+    return { text: null, error: `Resy: ${err.message}` };
+  }
+}
+
+// Also try Resy's internal API for venue events
+async function collectResyAPI(city) {
+  const cityName = city.split(',')[0].trim().toLowerCase();
+  const meta = CITY_META[cityName];
+  if (!meta) return { events: [], error: `No Resy config for ${cityName}` };
+
+  try {
+    // Resy has a public API endpoint for venue listings
+    const url = `https://api.resy.com/3/venuesearch/search?geo=${meta.lat},${meta.lng}&limit=20&query=experience&type=venue`;
+    const resp = await fetch(url, {
+      headers: {
+        'Authorization': 'ResyAPI api_key="VbWk7s3L4KiK5fzlO7JD3Q5EYolJI7n5"',
+        'Accept': 'application/json',
+        'Origin': 'https://resy.com',
+        'Referer': 'https://resy.com/',
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!resp.ok) return { events: [], error: `Resy API ${resp.status}` };
+    const data = await resp.json();
+    const venues = data?.results?.venues || [];
+
+    return {
+      events: venues.map(v => ({
+        source: 'resy',
+        title: v.name || '',
+        description: v.tagline || v.cuisine || '',
+        venue: v.name || '',
+        neighborhood: v.neighborhood || '',
+        city: cityName,
+        price: v.price_range_display || 'See venue',
+        url: `https://resy.com/cities/${meta.resySlug}/${v.url_slug || ''}`,
+        rating: v.rating || null,
+      })),
+      error: null,
+    };
+  } catch (err) {
+    return { events: [], error: `Resy API: ${err.message}` };
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SOURCE 3: OPENTABLE EXPERIENCES
+// Fetches the public experiences/specials page for the metro.
+// ══════════════════════════════════════════════════════════════════
+async function collectOpenTable(city) {
+  const cityName = city.split(',')[0].trim().toLowerCase();
+  const meta = CITY_META[cityName];
+  if (!meta?.openTableMetro) return { text: null, error: `No OpenTable metro for ${cityName}` };
+
+  try {
+    // OpenTable experiences page (metro 3 = Chicago)
+    const url = `https://www.opentable.com/experiences/${meta.openTableMetro}`;
+    const resp = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!resp.ok) return { text: null, error: `OpenTable ${resp.status}` };
+    const html = await resp.text();
+
+    const text = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<a[^>]*href="([^"]*)"[^>]*>/gi, ' [LINK:$1] ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+      .replace(/\n{3,}/g, '\n\n').replace(/ {2,}/g, ' ')
+      .trim();
+
+    if (text.length < 500) return { text: null, error: 'OpenTable page too short (likely JS-rendered)' };
+    return { text: text.substring(0, 15000), error: null };
+  } catch (err) {
+    return { text: null, error: `OpenTable: ${err.message}` };
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CLAUDE ENRICHMENT — processes all sources together
+// ══════════════════════════════════════════════════════════════════
+async function enrichAllEvents(tmFormatted, resyText, resyVenues, openTableText, city) {
   const cityName = city.split(',')[0].trim();
   const today = new Date().toISOString().split('T')[0];
-
-  // Split into chunks if too many (Claude works best with ~30 at a time)
-  const chunks = [];
-  for (let i = 0; i < formattedEvents.length; i += 30) {
-    chunks.push(formattedEvents.slice(i, i + 30));
-  }
-
   const allEnriched = [];
 
-  for (const chunk of chunks) {
-    const prompt = `You are a food event curator for SABOR, a food discovery app in ${cityName}. Today is ${today}.
+  // ── PASS 1: Ticketmaster events (structured data) ──
+  if (tmFormatted.length > 0) {
+    const chunks = [];
+    for (let i = 0; i < tmFormatted.length; i += 30) {
+      chunks.push(tmFormatted.slice(i, i + 30));
+    }
 
-From these ${chunk.length} Ticketmaster events, select ONLY the ones that are genuinely food or drink related. Be generous — if food or drink is a significant part of the event, include it.
+    for (const chunk of chunks) {
+      const prompt = `You are a food event curator for SABOR, a food discovery app in ${cityName}. Today is ${today}.
 
-INCLUDE:
-- Food festivals, tastings, cook-offs, food truck events
-- Wine/beer/cocktail/spirits tastings and festivals
-- Brunch events, dinner shows, chef events
-- Cooking classes, culinary experiences
-- Events at restaurants, breweries, wineries, distilleries
-- Cultural festivals where food is featured (Cinco de Mayo, etc.)
-- BBQ competitions, pizza festivals, seafood boils
-- Market events, night markets, pop-ups
-- Any event where the venue or description clearly involves food/drink
+From these ${chunk.length} Ticketmaster events, select ONLY the ones that are genuinely food or drink related.
 
-EXCLUDE:
-- Pure concerts/sports with no food angle
-- Conferences, trade shows
-- Events that already happened (before ${today})
-- DUPLICATES — if the same event appears at different dates, list it ONCE with the earliest upcoming date
+INCLUDE: Food festivals, tastings, cook-offs, wine/beer/cocktail events, brunch events, dinner shows, chef events, cooking classes, events at restaurants/breweries/wineries, cultural food festivals, BBQ competitions, night markets, pop-ups, happy hours.
 
-For each selected event, enrich it with a food-focused description and classify it.
+EXCLUDE: Pure concerts/sports with no food angle, conferences, events before ${today}.
+DUPLICATES: If the same event appears at different dates, list it ONCE with the earliest upcoming date.
 
 EVENTS:
 ${JSON.stringify(chunk, null, 2)}
 
 Respond ONLY with a valid JSON array (no markdown, no backticks):
-[
-  {
-    "title": "event title",
-    "description": "1-2 sentences focusing on the FOOD/DRINK aspect",
-    "venue": "venue name",
-    "neighborhood": "neighborhood or area in ${cityName}",
-    "date": "Day, Month Date",
-    "time": "start time",
-    "price": "price string",
-    "category": "festival" | "tasting" | "brunch" | "class" | "food_truck" | "special" | "market" | "happy_hour" | "pop_up",
-    "vibe": "Festival" | "Tasting" | "Brunch" | "Cooking Class" | "Food Trucks" | "Market" | "Happy Hour" | "Pop-Up" | "Food Event",
-    "url": "event URL",
-    "image": "image URL or null",
-    "tags": ["relevant", "tags"],
-    "confidence": "high" | "medium"
-  }
-]
+[{"title":"event title","description":"1-2 sentences focusing on FOOD/DRINK","venue":"venue name","neighborhood":"area in ${cityName}","date":"Day, Month Date","time":"start time","price":"price","category":"festival|tasting|brunch|class|food_truck|special|market|happy_hour|pop_up","vibe":"Festival|Tasting|Brunch|Cooking Class|Food Trucks|Market|Happy Hour|Pop-Up|Food Event","url":"event URL","image":"image URL or null","tags":["relevant","tags"],"confidence":"high|medium"}]
 
-Return [] if nothing qualifies as food/drink.`;
+Return [] if nothing qualifies.`;
 
-    try {
-      const message = await claude.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 4000,
-        messages: [{ role: 'user', content: prompt }],
-      });
-
-      const raw = message.content[0]?.text || '[]';
-      let cleaned = raw.trim();
-      if (cleaned.startsWith('```')) {
-        cleaned = cleaned.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
+      try {
+        const msg = await claude.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 4000,
+          messages: [{ role: 'user', content: prompt }],
+        });
+        const raw = msg.content[0]?.text || '[]';
+        let cleaned = raw.trim();
+        if (cleaned.startsWith('```')) cleaned = cleaned.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
+        allEnriched.push(...JSON.parse(cleaned));
+      } catch (err) {
+        console.error('Claude TM enrichment failed:', err.message);
       }
-      const events = JSON.parse(cleaned);
-      allEnriched.push(...events);
-    } catch (err) {
-      console.error('Claude enrichment chunk failed:', err.message);
     }
   }
 
-  // Deduplicate by title+venue (Claude sometimes returns the same event twice)
+  // ── PASS 2: Resy + OpenTable (unstructured HTML text + venue data) ──
+  const webSources = [];
+  if (resyText) webSources.push(`=== RESY EXPERIENCES (${cityName}) ===\n${resyText}`);
+  if (resyVenues.length > 0) {
+    webSources.push(`=== RESY VENUES WITH EXPERIENCES ===\n${JSON.stringify(resyVenues.slice(0, 15), null, 2)}`);
+  }
+  if (openTableText) webSources.push(`=== OPENTABLE EXPERIENCES (${cityName}) ===\n${openTableText}`);
+
+  if (webSources.length > 0) {
+    const webPrompt = `You are a food event curator for SABOR, a food discovery app in ${cityName}. Today is ${today}.
+
+I've scraped Resy and/or OpenTable for dining experiences, special menus, happy hours, and events. Extract REAL food & drink experiences that users can actually attend or book.
+
+PRIORITIZE HIGH-END & UNIQUE:
+- Prix fixe & tasting menus at upscale restaurants
+- Chef's table experiences, omakase, chef collaborations
+- Wine/cocktail pairing dinners
+- Rooftop dining events, seasonal specials
+- Happy hours at notable restaurants and bars
+- Themed dinner experiences (supper clubs, pop-ups)
+- Bottomless brunch specials
+- Distillery/brewery/winery tastings
+- Special holiday or seasonal menus
+
+EXCLUDE: Generic restaurant listings with no special event or experience, closed/past events.
+
+SCRAPED CONTENT:
+${webSources.join('\n\n')}
+
+Respond ONLY with a valid JSON array (no markdown, no backticks):
+[{"title":"experience name","description":"1-2 sentences with specific food/drink details and what makes it special","venue":"restaurant/bar name","neighborhood":"area in ${cityName}","date":"Ongoing" or "Day, Month Date" if specific,"time":"typical hours or specific time","price":"$XX" or "$$$$" tier or "See venue","category":"tasting|brunch|happy_hour|pop_up|special|class","vibe":"Tasting|Brunch|Happy Hour|Pop-Up|Chef's Table|Food Event","url":"booking/info URL if found","image":null,"tags":["upscale","relevant","tags"],"confidence":"high|medium"}]
+
+Return [] if nothing qualifies.`;
+
+    try {
+      const msg = await claude.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 4000,
+        messages: [{ role: 'user', content: webPrompt }],
+      });
+      const raw = msg.content[0]?.text || '[]';
+      let cleaned = raw.trim();
+      if (cleaned.startsWith('```')) cleaned = cleaned.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
+      const webEvents = JSON.parse(cleaned);
+      console.log(`🍷 Claude extracted ${webEvents.length} events from Resy/OpenTable`);
+      allEnriched.push(...webEvents);
+    } catch (err) {
+      console.error('Claude web enrichment failed:', err.message);
+    }
+  }
+
+  // Deduplicate by title+venue
   const seen = new Set();
   const deduped = allEnriched.filter(e => {
     const key = `${e.title}_${e.venue}`.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -258,11 +380,13 @@ Return [] if nothing qualifies as food/drink.`;
     return true;
   });
 
-  console.log(`🎯 Claude selected ${deduped.length} food events (${allEnriched.length} before dedup)`);
+  console.log(`🎯 Total: ${deduped.length} food events (${allEnriched.length} before dedup)`);
   return deduped;
 }
 
-// ── FIRESTORE STORAGE ──
+// ══════════════════════════════════════════════════════════════════
+// FIRESTORE STORAGE
+// ══════════════════════════════════════════════════════════════════
 async function storeEvents(events, city) {
   if (!events.length) return 0;
 
@@ -272,7 +396,8 @@ async function storeEvents(events, city) {
 
   const emojiMap = {
     'happy_hour': '🍹', 'festival': '🎉', 'pop_up': '🔥', 'tasting': '🍷',
-    'brunch': '🥂', 'class': '👨‍🍳', 'food_truck': '🌮', 'special': '⭐', 'market': '🏪',
+    'brunch': '🥂', 'class': '👨‍🍳', 'food_truck': '🌮', 'special': '⭐',
+    'market': '🏪', 'chefs_table': '👨‍🍳',
   };
 
   const batch = db.batch();
@@ -282,6 +407,10 @@ async function storeEvents(events, city) {
 
     const idBase = `${event.title}_${event.venue}`.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 50);
     const docId = `scout_${idBase}`;
+
+    // Events with specific dates get 14-day TTL; ongoing experiences get 7 days
+    const isOngoing = /ongoing|every|weekly|daily/i.test(event.date || '');
+    const ttlDays = isOngoing ? 7 : 14;
 
     const doc = {
       id: docId,
@@ -303,10 +432,10 @@ async function storeEvents(events, city) {
       tags: [...(event.tags || []), 'food', 'sabor', event.category].filter(Boolean),
       source: 'SABOR',
       url: event.url || null,
-      recurring: false,
+      recurring: isOngoing,
       confidence: event.confidence || 'medium',
       scoutedAt: now.toISOString(),
-      expiresAt: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      expiresAt: new Date(now.getTime() + ttlDays * 24 * 60 * 60 * 1000).toISOString(),
     };
 
     batch.set(collection.doc(docId), doc, { merge: true });
@@ -318,7 +447,9 @@ async function storeEvents(events, city) {
   return stored;
 }
 
-// ── CLEANUP EXPIRED ──
+// ══════════════════════════════════════════════════════════════════
+// CLEANUP EXPIRED
+// ══════════════════════════════════════════════════════════════════
 async function cleanupExpired() {
   const now = new Date().toISOString();
   const expired = await db.collection('sabor_events')
@@ -334,7 +465,9 @@ async function cleanupExpired() {
   return expired.size;
 }
 
-// ── MAIN HANDLER ──
+// ══════════════════════════════════════════════════════════════════
+// MAIN HANDLER
+// ══════════════════════════════════════════════════════════════════
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
@@ -355,24 +488,43 @@ export default async function handler(req, res) {
   console.log(`🔍 Event Scout starting for ${city}`);
 
   try {
-    // Step 1: Collect raw events from Ticketmaster
-    const { events: rawEvents, debug } = await collectEvents(city);
+    // Step 1: Collect from ALL sources in parallel
+    const [tmResult, resyPage, resyAPI, otPage] = await Promise.all([
+      collectTicketmaster(city),
+      collectResy(city),
+      collectResyAPI(city),
+      collectOpenTable(city),
+    ]);
 
-    if (rawEvents.length === 0) {
-      const cleaned = await cleanupExpired();
-      return res.status(200).json({
-        success: true, city, collected: 0, enriched: 0, stored: 0, cleaned,
-        events: [], debug,
-      });
-    }
+    const tmEvents = tmResult.events;
+    const sourceDebug = {
+      ticketmaster: { count: tmEvents.length, errors: tmResult.errors.slice(0, 3) },
+      resy: {
+        pageLength: resyPage.text?.length || 0,
+        apiVenues: resyAPI.events?.length || 0,
+        errors: [resyPage.error, resyAPI.error].filter(Boolean),
+      },
+      openTable: {
+        pageLength: otPage.text?.length || 0,
+        error: otPage.error,
+      },
+    };
 
-    // Step 2: Format for Claude
-    const formatted = formatForClaude(rawEvents, city);
+    console.log(`📊 TM: ${tmEvents.length} | Resy page: ${resyPage.text?.length || 0} chars, API: ${resyAPI.events?.length || 0} venues | OT: ${otPage.text?.length || 0} chars`);
 
-    // Step 3: Claude enrichment — picks best food events
-    const enriched = await enrichEvents(formatted, city);
+    // Step 2: Format Ticketmaster events for Claude
+    const tmFormatted = formatTicketmasterForClaude(tmEvents, city);
 
-    // Step 4: Store in Firestore as SABOR picks
+    // Step 3: Claude enrichment — all sources in one pass
+    const enriched = await enrichAllEvents(
+      tmFormatted,
+      resyPage.text,
+      resyAPI.events || [],
+      otPage.text,
+      city,
+    );
+
+    // Step 4: Store in Firestore
     const stored = await storeEvents(enriched, city);
 
     // Step 5: Cleanup expired
@@ -381,17 +533,17 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       city,
-      collected: rawEvents.length,
+      sources: sourceDebug,
       enriched: enriched.length,
       stored,
       cleaned,
-      debug,
       events: enriched.map(e => ({
         title: e.title,
         venue: e.venue,
         date: e.date,
         category: e.category,
         neighborhood: e.neighborhood,
+        price: e.price,
       })),
     });
   } catch (err) {
