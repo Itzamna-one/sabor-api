@@ -42,8 +42,11 @@ async function collectEvents(city) {
   const apiKey = process.env.TICKETMASTER_API_KEY;
   if (!apiKey) return { events: [], errors: ['TICKETMASTER_API_KEY not set'] };
 
-  // Deep food & drink queries — cast a wide net
-  const queries = [
+  const allEvents = [];
+  const errors = [];
+
+  // ── STRATEGY 1: Keyword search (food-specific terms) ──
+  const foodKeywords = [
     'food festival', 'food truck', 'wine tasting', 'beer festival',
     'brunch', 'cooking class', 'taco', 'bbq barbecue',
     'cocktail', 'happy hour', 'chef dinner', 'latin food mexican',
@@ -51,18 +54,44 @@ async function collectEvents(city) {
     'seafood', 'pizza fest', 'whiskey tasting', 'rooftop dining',
   ];
 
-  const allEvents = [];
-  const errors = [];
-
-  // 4 at a time to stay within TM rate limits
-  for (let i = 0; i < queries.length; i += 4) {
-    const batch = queries.slice(i, i + 4);
+  for (let i = 0; i < foodKeywords.length; i += 4) {
+    const batch = foodKeywords.slice(i, i + 4);
     const results = await Promise.all(batch.map(q => searchTM(q, city, apiKey, { size: 8 })));
     allEvents.push(...results.flat());
-    if (i + 4 < queries.length) await new Promise(r => setTimeout(r, 300));
+    if (i + 4 < foodKeywords.length) await new Promise(r => setTimeout(r, 300));
   }
 
-  // Deduplicate
+  // ── STRATEGY 2: TM segment search (events classified as food/drink) ──
+  // TM classifies some events under segments even if title doesn't say "food"
+  const segmentQueries = [
+    { keyword: '', classificationName: 'Food & Drink' },
+    { keyword: 'dinner', classificationName: 'Food & Drink' },
+    { keyword: 'tasting', classificationName: 'Food & Drink' },
+  ];
+  const segResults = await Promise.all(
+    segmentQueries.map(q => searchTM(q.keyword, city, apiKey, { size: 20, classificationName: q.classificationName }))
+  );
+  allEvents.push(...segResults.flat());
+  await new Promise(r => setTimeout(r, 300));
+
+  // ── STRATEGY 3: Broader cultural queries that often involve food ──
+  // TM has way more music/arts events — but many happen at restaurants,
+  // breweries, and food venues. Claude will filter for food angle.
+  const culturalKeywords = [
+    'brewery', 'winery', 'distillery', 'rooftop',
+    'jazz dinner', 'drag brunch', 'comedy dinner',
+    'latin festival', 'cultural festival', 'street festival',
+    'farmers market', 'pop up', 'speakeasy',
+  ];
+
+  for (let i = 0; i < culturalKeywords.length; i += 4) {
+    const batch = culturalKeywords.slice(i, i + 4);
+    const results = await Promise.all(batch.map(q => searchTM(q, city, apiKey, { size: 8 })));
+    allEvents.push(...results.flat());
+    if (i + 4 < culturalKeywords.length) await new Promise(r => setTimeout(r, 300));
+  }
+
+  // Deduplicate by TM event ID
   const seen = new Set();
   const unique = allEvents.filter(e => {
     if (seen.has(e.id)) return false;
