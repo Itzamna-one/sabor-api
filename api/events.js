@@ -144,9 +144,13 @@ async function fetchTicketmasterEvents(city) {
 }
 
 // ── FIRESTORE SCOUTED EVENTS ──
+let _scoutDebug = null; // expose errors in response for debugging
 async function fetchScoutedEvents(city) {
+  _scoutDebug = null;
   try {
     const now = new Date().toISOString();
+    _scoutDebug = { query: { city, expiresAfter: now } };
+
     const snapshot = await db.collection('sabor_events')
       .where('city', '==', city)
       .where('expiresAt', '>', now)
@@ -154,6 +158,7 @@ async function fetchScoutedEvents(city) {
       .limit(30)
       .get();
 
+    _scoutDebug.docsFound = snapshot.size;
     if (snapshot.empty) return [];
 
     return snapshot.docs.map(doc => {
@@ -182,11 +187,8 @@ async function fetchScoutedEvents(city) {
       };
     });
   } catch (err) {
-    // If composite index is missing, Firestore includes a URL to create it
     console.error('Firestore scout fetch error:', err.message);
-    if (err.message?.includes('index')) {
-      console.error('⚠️ Create the required Firestore composite index. Check the error URL above.');
-    }
+    _scoutDebug = { error: err.message };
     return [];
   }
 }
@@ -252,5 +254,6 @@ export default async function handler(req, res) {
     events,
     total: events.length,
     sources: { sabor: saborEvents.length, ticketmaster: tmEvents.length },
+    _scoutDebug,
   });
 }
