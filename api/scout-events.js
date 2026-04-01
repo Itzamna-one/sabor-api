@@ -202,6 +202,7 @@ EXCLUDE:
 - Pure concerts/sports with no food angle
 - Conferences, trade shows
 - Events that already happened (before ${today})
+- DUPLICATES — if the same event appears at different dates, list it ONCE with the earliest upcoming date
 
 For each selected event, enrich it with a food-focused description and classify it.
 
@@ -248,8 +249,17 @@ Return [] if nothing qualifies as food/drink.`;
     }
   }
 
-  console.log(`🎯 Claude selected ${allEnriched.length} food events`);
-  return allEnriched;
+  // Deduplicate by title+venue (Claude sometimes returns the same event twice)
+  const seen = new Set();
+  const deduped = allEnriched.filter(e => {
+    const key = `${e.title}_${e.venue}`.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  console.log(`🎯 Claude selected ${deduped.length} food events (${allEnriched.length} before dedup)`);
+  return deduped;
 }
 
 // ── FIRESTORE STORAGE ──

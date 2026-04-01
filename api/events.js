@@ -182,7 +182,11 @@ async function fetchScoutedEvents(city) {
       };
     });
   } catch (err) {
+    // If composite index is missing, Firestore includes a URL to create it
     console.error('Firestore scout fetch error:', err.message);
+    if (err.message?.includes('index')) {
+      console.error('⚠️ Create the required Firestore composite index. Check the error URL above.');
+    }
     return [];
   }
 }

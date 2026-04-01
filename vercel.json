@@ -23,7 +23,7 @@
       "maxDuration": 30
     },
     "api/events.js": {
-      "maxDuration": 15
+      "maxDuration": 30
     },
     "api/scout-events.js": {
       "maxDuration": 60
