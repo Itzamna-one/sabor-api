@@ -148,19 +148,31 @@ function resolveChicagoNeighborhood(address) {
   // Extract street name
   const streetLower = addr.toLowerCase();
 
-  // ── Pre-ZIP cross-validation for long streets that cross many neighborhoods ──
-  // The AI sometimes assigns the wrong ZIP on major N-S streets like Pulaski, Western, Kedzie.
-  // Chicago street numbers: 800 per mile, N/S axis is Madison (0). 2600 S = ~26th St, 6600 S = ~66th St.
+  // ── Pre-ZIP cross-validation for long N-S streets ──
+  // The AI hallucinate wrong ZIPs on major streets. Street numbers are authoritative:
+  // Chicago grid: 800 addresses = 1 mile. Madison St = 0. South addresses are positive.
+  // 2600 S ≈ 26th St, 3900 S ≈ 39th St, 4800 S ≈ 48th St, 5500 S ≈ 55th St, 6600 S ≈ 66th St
   if (streetNum && /\bpulaski\b/.test(streetLower)) {
-    if (streetNum >= 5500) return 'Chicago Lawn';       // 55th+ S Pulaski → Chicago Lawn / Marquette Park
-    if (streetNum >= 3900 && streetNum < 5500) return 'Brighton Park'; // 39th-54th S Pulaski
-    if (streetNum >= 2200 && streetNum < 3900) return 'Little Village'; // 22nd-38th S Pulaski (La Villita core)
-    if (streetNum >= 100 && streetNum < 2200) return 'North Lawndale'; // north of 22nd
+    if (streetNum >= 6300) return 'Chicago Lawn';
+    if (streetNum >= 5500 && streetNum < 6300) return 'West Lawn';
+    if (streetNum >= 4300 && streetNum < 5500) return 'Archer Heights';
+    if (streetNum >= 3500 && streetNum < 4300) return 'Brighton Park';
+    if (streetNum >= 2200 && streetNum < 3500) return 'Little Village';
+    if (streetNum >= 800 && streetNum < 2200) return 'North Lawndale';
+    if (streetNum < 800) return 'Humboldt Park'; // only NORTH Pulaski is Humboldt Park
   }
   if (streetNum && /\bwestern\b/.test(streetLower)) {
     if (streetNum >= 6300) return 'Marquette Park';
     if (streetNum >= 4700 && streetNum < 6300) return 'Gage Park';
     if (streetNum >= 3100 && streetNum < 4700) return 'Brighton Park';
+    if (streetNum >= 2200 && streetNum < 3100) return 'Little Village';
+  }
+  if (streetNum && /\bkedzie\b/.test(streetLower)) {
+    if (streetNum >= 4700) return 'Gage Park';
+    if (streetNum >= 3500 && streetNum < 4700) return 'Brighton Park';
+    if (streetNum >= 2200 && streetNum < 3500) return 'Little Village';
+    if (streetNum >= 800 && streetNum < 2200) return 'North Lawndale';
+    if (streetNum < 800) return 'Humboldt Park';
   }
 
   // ── Chicago ZIP-based resolution with street disambiguation ──
