@@ -1,5 +1,11 @@
 {
   "version": 2,
+  "crons": [
+    {
+      "path": "/api/scout-events?city=Chicago,%20IL",
+      "schedule": "0 12 * * *"
+    }
+  ],
   "functions": {
     "api/search.js": {
       "maxDuration": 60
@@ -18,6 +24,9 @@
     },
     "api/events.js": {
       "maxDuration": 15
+    },
+    "api/scout-events.js": {
+      "maxDuration": 60
     }
   },
   "headers": [

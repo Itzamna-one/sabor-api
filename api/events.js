@@ -1,5 +1,16 @@
-// api/events.js — Real events via Ticketmaster + Eventbrite APIs
+// api/events.js — Real events via Ticketmaster + Eventbrite + SABOR Scout
 // No curated/fake events — only verified, real events users can actually attend.
+// SABOR Scout events are AI-scouted from the web and stored in Firestore.
+
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+
+// Firebase Admin
+if (!getApps().length) {
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
+  initializeApp({ credential: cert(serviceAccount) });
+}
+const db = getFirestore();
 
 // City → lat/lng for Eventbrite location search
 const CITY_COORDS = {
@@ -244,6 +255,50 @@ async function fetchTicketmasterEvents(city) {
   }
 }
 
+// ── FIRESTORE SCOUTED EVENTS ──
+async function fetchScoutedEvents(city) {
+  try {
+    const now = new Date().toISOString();
+    const snapshot = await db.collection('sabor_events')
+      .where('city', '==', city)
+      .where('expiresAt', '>', now)
+      .orderBy('expiresAt')
+      .limit(30)
+      .get();
+
+    if (snapshot.empty) return [];
+
+    return snapshot.docs.map(doc => {
+      const d = doc.data();
+      return {
+        id: d.id || doc.id,
+        title: d.title,
+        description: d.description || '',
+        venue: d.venue,
+        neighborhood: d.neighborhood || city.split(',')[0].trim(),
+        city: d.city || city,
+        date: d.date || '',
+        time: d.time || '',
+        price: d.price || 'See venue',
+        priceNum: d.priceNum || 0,
+        category: d.category || 'special',
+        vibe: d.vibe || 'Food Event',
+        emoji: d.emoji || '🍽️',
+        image: d.image || null,
+        premiumOnly: false,
+        earlyAccess: false,
+        tags: d.tags || ['food', 'sabor'],
+        source: 'SABOR',
+        url: d.url || null,
+        recurring: d.recurring || false,
+      };
+    });
+  } catch (err) {
+    console.error('Firestore scout fetch error:', err.message);
+    return [];
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -253,15 +308,17 @@ export default async function handler(req, res) {
 
   const { city = 'Chicago, IL', category, budget } = req.query;
 
-  // Fetch from both APIs in parallel
-  const [tmEvents, ebEvents] = await Promise.all([
+  // Fetch from all 3 sources in parallel
+  const [tmEvents, ebEvents, saborEvents] = await Promise.all([
     fetchTicketmasterEvents(city).catch(err => { console.error('TM failed:', err.message); return []; }),
     fetchEventbriteEvents(city).catch(err => { console.error('EB failed:', err.message); return []; }),
+    fetchScoutedEvents(city).catch(err => { console.error('Scout failed:', err.message); return []; }),
   ]);
 
-  // Merge and deduplicate (by title similarity — same event listed on both platforms)
+  // Merge and deduplicate (by title similarity — same event listed on multiple platforms)
+  // SABOR scouted events go first so they win dedup conflicts
   const seen = new Set();
-  let events = [...ebEvents, ...tmEvents].filter(e => {
+  let events = [...saborEvents, ...ebEvents, ...tmEvents].filter(e => {
     const key = e.title.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 30);
     if (seen.has(key)) return false;
     seen.add(key);
@@ -303,6 +360,6 @@ export default async function handler(req, res) {
   return res.status(200).json({
     events,
     total: events.length,
-    sources: { ticketmaster: tmEvents.length, eventbrite: ebEvents.length },
+    sources: { sabor: saborEvents.length, ticketmaster: tmEvents.length, eventbrite: ebEvents.length },
   });
 }
