@@ -1,11 +1,11 @@
-// api/scout-events.js — AI Event Scout
-// Searches the web for real food events, happy hours, pop-ups, and festivals.
-// Uses SerpAPI for search + Claude Haiku for intelligent extraction.
+// api/scout-events.js — AI Event Scout (No external search API needed)
+// Fetches public event listing pages directly, then uses Claude Haiku to extract
+// real food events, happy hours, pop-ups, and festivals.
 // Stores verified events in Firestore for the SABOR events feed.
 //
 // Triggered by:
-// 1. Vercel Cron (daily at 6 AM CT)
-// 2. Manual POST with NOTIFY_API_SECRET header
+// 1. Vercel Cron (daily at 6 AM CT → "0 12 * * *" UTC)
+// 2. Manual POST with API_SECRET header
 
 import Anthropic from '@anthropic-ai/sdk';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
@@ -19,155 +19,210 @@ if (!getApps().length) {
 const db = getFirestore();
 const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// ── SEARCH QUERIES ──
-// Designed to surface real, verified food events — not blog posts or old listings.
-// Rotates daily so we don't hit the same results every run.
-function getSearchQueries(city, dayOfWeek) {
-  const cityName = city.split(',')[0].trim();
-  const base = [
-    `food events ${cityName} this week 2026`,
-    `happy hour specials ${cityName} this week`,
-    `food truck rally ${cityName} 2026`,
-    `pop up dinner ${cityName} this month`,
-    `taco tuesday ${cityName} specials`,
-    `restaurant week ${cityName} 2026`,
-    `food festival ${cityName} upcoming`,
-    `brunch event ${cityName} this weekend`,
-    `wine tasting dinner ${cityName}`,
-    `night market ${cityName} 2026`,
-    `cooking class ${cityName} this month`,
-    `brewery food event ${cityName}`,
-    `latin food festival ${cityName}`,
-    `street food market ${cityName} 2026`,
+// ── PUBLIC EVENT SOURCES ──
+// Free, publicly accessible event listing pages with food/drink events in Chicago.
+// No API keys needed — just fetch the HTML and let Claude parse it.
+function getEventSources(city) {
+  const cityName = city.split(',')[0].trim().toLowerCase();
+
+  if (cityName === 'chicago') {
+    return [
+      {
+        url: 'https://www.eventbrite.com/d/il--chicago/food-and-drink--events--this-week/',
+        name: 'Eventbrite Food This Week',
+      },
+      {
+        url: 'https://www.eventbrite.com/d/il--chicago/food-and-drink--events--next-week/',
+        name: 'Eventbrite Food Next Week',
+      },
+      {
+        url: 'https://www.eventbrite.com/d/il--chicago/food-festival/',
+        name: 'Eventbrite Food Festivals',
+      },
+      {
+        url: 'https://www.eventbrite.com/d/il--chicago/happy-hour/',
+        name: 'Eventbrite Happy Hours',
+      },
+      {
+        url: 'https://www.eventbrite.com/d/il--chicago/cooking-class/',
+        name: 'Eventbrite Cooking Classes',
+      },
+      {
+        url: 'https://www.eventbrite.com/d/il--chicago/wine-tasting/',
+        name: 'Eventbrite Wine Tastings',
+      },
+      {
+        url: 'https://do312.com/categories/food-drink',
+        name: 'Do312 Food & Drink',
+      },
+      {
+        url: 'https://www.choosechicago.com/events/food-drink/',
+        name: 'Choose Chicago Food Events',
+      },
+    ];
+  }
+
+  if (cityName === 'indianapolis') {
+    return [
+      {
+        url: 'https://www.eventbrite.com/d/in--indianapolis/food-and-drink--events--this-week/',
+        name: 'Eventbrite Indy Food This Week',
+      },
+      {
+        url: 'https://www.eventbrite.com/d/in--indianapolis/food-festival/',
+        name: 'Eventbrite Indy Festivals',
+      },
+      {
+        url: 'https://www.eventbrite.com/d/in--indianapolis/happy-hour/',
+        name: 'Eventbrite Indy Happy Hours',
+      },
+    ];
+  }
+
+  // Generic fallback for other cities
+  const stateAbbrev = city.includes('IL') ? 'il' : city.includes('IN') ? 'in' : 'il';
+  return [
+    {
+      url: `https://www.eventbrite.com/d/${stateAbbrev}--${encodeURIComponent(cityName)}/food-and-drink--events--this-week/`,
+      name: `Eventbrite ${cityName} Food`,
+    },
   ];
-
-  // Day-specific queries
-  const daySpecific = {
-    0: [`sunday brunch specials ${cityName}`, `sunday funday food ${cityName}`],
-    1: [`monday food deals ${cityName}`, `industry night ${cityName}`],
-    2: [`taco tuesday ${cityName}`, `tuesday food specials ${cityName}`],
-    3: [`wine wednesday ${cityName}`, `wednesday happy hour ${cityName}`],
-    4: [`thirsty thursday ${cityName} food`, `thursday specials ${cityName}`],
-    5: [`friday happy hour ${cityName}`, `friday night food event ${cityName}`],
-    6: [`saturday food festival ${cityName}`, `saturday brunch ${cityName}`],
-  };
-
-  // Pick 6 base queries (rotate by day) + 2 day-specific
-  const rotated = [...base.slice(dayOfWeek * 2), ...base.slice(0, dayOfWeek * 2)];
-  return [...rotated.slice(0, 6), ...(daySpecific[dayOfWeek] || [])];
 }
 
-// ── SERPAPI SEARCH ──
-async function searchWeb(query) {
-  const apiKey = process.env.SERPAPI_KEY;
-  if (!apiKey) { console.error('SERPAPI_KEY not set'); return []; }
-
+// ── FETCH PAGE CONTENT ──
+async function fetchPage(source) {
   try {
-    const params = new URLSearchParams({
-      q: query,
-      api_key: apiKey,
-      engine: 'google',
-      num: 8,
-      gl: 'us',
-      hl: 'en',
+    const resp = await fetch(source.url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      signal: AbortSignal.timeout(10000),
+      redirect: 'follow',
     });
-    const resp = await fetch(`https://serpapi.com/search?${params}`, {
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!resp.ok) { console.error(`SerpAPI error: ${resp.status}`); return []; }
-    const data = await resp.json();
 
-    // Extract organic results + events pack if available
-    const organic = (data.organic_results || []).map(r => ({
-      title: r.title || '',
-      snippet: r.snippet || '',
-      link: r.link || '',
-      date: r.date || '',
-    }));
+    if (!resp.ok) {
+      console.error(`Failed to fetch ${source.name}: ${resp.status}`);
+      return null;
+    }
 
-    const events = (data.events_results || []).map(r => ({
-      title: r.title || '',
-      snippet: r.description || '',
-      link: r.link || '',
-      date: r.date?.when || '',
-      venue: r.venue?.name || '',
-      address: r.venue?.address || '',
-    }));
+    const html = await resp.text();
 
-    return [...events, ...organic];
+    // Extract text content — strip HTML tags but keep structure
+    // Focus on event-relevant content, skip nav/footer/scripts
+    let text = html
+      // Remove scripts and styles
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      // Remove HTML comments
+      .replace(/<!--[\s\S]*?-->/g, '')
+      // Convert relevant tags to markers
+      .replace(/<(h[1-6]|div|li|article|section|p)[^>]*>/gi, '\n---ITEM---\n')
+      .replace(/<a[^>]*href="([^"]*)"[^>]*>/gi, ' [LINK:$1] ')
+      .replace(/<time[^>]*datetime="([^"]*)"[^>]*>/gi, ' [DATE:$1] ')
+      .replace(/<\/?(br|hr)[^>]*>/gi, '\n')
+      // Strip remaining tags
+      .replace(/<[^>]+>/g, ' ')
+      // Clean up whitespace
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&#\d+;/g, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/ {2,}/g, ' ')
+      .trim();
+
+    // Truncate to ~12000 chars to stay within Claude's efficient range
+    if (text.length > 12000) {
+      text = text.substring(0, 12000) + '\n...[truncated]';
+    }
+
+    return { source: source.name, url: source.url, content: text };
   } catch (err) {
-    console.error(`Search failed for "${query}":`, err.message);
-    return [];
+    console.error(`Fetch error for ${source.name}:`, err.message);
+    return null;
   }
 }
 
 // ── CLAUDE EXTRACTION ──
-async function extractEvents(searchResults, city) {
-  if (!searchResults.length) return [];
+async function extractEvents(pages, city) {
+  if (!pages.length) return [];
 
   const today = new Date();
   const dateStr = today.toISOString().split('T')[0];
   const cityName = city.split(',')[0].trim();
+  const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const todayName = dayNames[today.getDay()];
 
-  const prompt = `You are an event data extractor for a food discovery app in ${cityName}. Today is ${dateStr}.
+  // Combine all page content into one prompt
+  const pagesText = pages.map(p =>
+    `\n=== SOURCE: ${p.source} (${p.url}) ===\n${p.content}`
+  ).join('\n\n');
 
-Given these web search results, extract ONLY real, verified food-related events. Include:
-- Food festivals, pop-ups, tasting dinners
-- Happy hours at specific restaurants (recurring weekly counts!)
-- Taco Tuesdays, Wine Wednesdays, and other recurring food specials
-- Food truck rallies and night markets
-- Cooking classes and chef events
-- Brunch events and bottomless specials
-- Restaurant week events
-- Beer/wine/cocktail tasting events
+  const prompt = `You are an event data extractor for SABOR, a food discovery app in ${cityName}. Today is ${todayName}, ${dateStr}.
+
+I've scraped several event listing websites. Extract ONLY real, verified food-related events happening THIS WEEK or NEXT WEEK. Include:
+- Food festivals, pop-ups, tasting dinners, supper clubs
+- Happy hours at specific restaurants/bars (recurring weekly counts!)
+- Taco Tuesdays, Wine Wednesdays, themed food nights
+- Food truck rallies, night markets, street food events
+- Cooking classes, chef collaborations, prix fixe dinners
+- Brunch events, bottomless specials, drag brunches with food
+- Beer/wine/cocktail tasting events, brewery dinners
+- Restaurant week promotions
+- Latin food events, cultural food celebrations
 
 STRICT RULES:
-- ONLY extract events with a REAL venue name and a date/day (even "every Tuesday" counts)
-- NO blog posts, listicles, or "top 10" articles — those are NOT events
-- NO events that already happened (before today)
-- NO duplicates (same event from multiple search results)
-- For recurring events (happy hours, Taco Tuesday), set recurring: true and include the day of week
-- Price should be specific if available, otherwise "See venue" or "Free"
-- URL must be a real link to event details or the venue
+- ONLY extract events with a REAL venue name and a specific date or recurring day
+- Each event MUST have enough detail to be useful (venue + date + what it is)
+- NO generic articles, "top 10" lists, or blog posts — ONLY actual events
+- NO events that already passed (before ${dateStr})
+- NO duplicates
+- For recurring events (happy hours, Taco Tuesday), set recurring: true
+- Use [LINK:...] URLs from the content when available
+- If a price is mentioned, include it; otherwise use "See venue"
 
-Search results:
-${JSON.stringify(searchResults.slice(0, 30), null, 2)}
+SCRAPED PAGES:
+${pagesText}
 
-Respond ONLY with valid JSON array (no markdown, no backticks):
+Respond ONLY with a valid JSON array (no markdown, no code fences, no explanation):
 [
   {
     "title": "event name",
-    "description": "1-2 sentence description with specific food/drink details",
+    "description": "1-2 sentences with specific food/drink details",
     "venue": "real venue name",
-    "neighborhood": "neighborhood or area in ${cityName}",
+    "neighborhood": "neighborhood in ${cityName}",
     "date": "Day, Month Date" or "Every Tuesday" for recurring,
-    "time": "start time - end time" or "varies",
+    "time": "start - end time" or "varies",
     "price": "$XX" or "Free" or "See venue",
     "category": "happy_hour" | "festival" | "pop_up" | "tasting" | "brunch" | "class" | "food_truck" | "special" | "market",
     "recurring": true/false,
     "recurringDay": "tuesday" (only if recurring),
-    "url": "link to event or venue page",
+    "url": "link to event page if found",
     "tags": ["relevant", "tags"],
-    "confidence": "high" | "medium" (how sure you are this is a real, current event)
+    "confidence": "high" | "medium"
   }
 ]
 
-Only include events with "high" or "medium" confidence. If no valid events found, return [].`;
+Only include events with "high" or "medium" confidence. Return [] if nothing valid found.`;
 
   try {
     const message = await claude.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2000,
+      max_tokens: 3000,
       messages: [{ role: 'user', content: prompt }],
     });
 
     const raw = message.content[0]?.text || '[]';
-    // Try to parse — handle markdown wrapping
     let cleaned = raw.trim();
     if (cleaned.startsWith('```')) {
       cleaned = cleaned.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
     }
-    return JSON.parse(cleaned);
+    const events = JSON.parse(cleaned);
+    console.log(`🎯 Claude extracted ${events.length} events`);
+    return events;
   } catch (err) {
     console.error('Claude extraction failed:', err.message);
     return [];
@@ -197,7 +252,6 @@ async function storeEvents(events, city) {
     // Format date for the app
     let formattedDate = event.date || '';
     if (event.recurring && event.recurringDay) {
-      // Find next occurrence of this day
       const targetDay = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'].indexOf(event.recurringDay.toLowerCase());
       if (targetDay >= 0) {
         const daysUntil = (targetDay - now.getDay() + 7) % 7;
@@ -207,10 +261,15 @@ async function storeEvents(events, city) {
       }
     }
 
-    // Determine emoji based on category
     const emojiMap = {
       'happy_hour': '🍹', 'festival': '🎉', 'pop_up': '🔥', 'tasting': '🍷',
       'brunch': '🥂', 'class': '👨‍🍳', 'food_truck': '🌮', 'special': '⭐', 'market': '🏪',
+    };
+
+    const vibeMap = {
+      'happy_hour': 'Happy Hour', 'brunch': 'Brunch', 'festival': 'Festival',
+      'tasting': 'Tasting', 'class': 'Cooking Class', 'pop_up': 'Pop-Up',
+      'food_truck': 'Food Trucks', 'market': 'Market', 'special': 'Food Event',
     };
 
     const doc = {
@@ -225,7 +284,7 @@ async function storeEvents(events, city) {
       price: event.price || 'See venue',
       priceNum: parseInt(event.price?.replace(/[^0-9]/g, '')) || 0,
       category: event.category || 'special',
-      vibe: event.category === 'happy_hour' ? 'Happy Hour' : event.category === 'brunch' ? 'Brunch' : 'Food Event',
+      vibe: vibeMap[event.category] || 'Food Event',
       emoji: emojiMap[event.category] || '🍽️',
       image: null,
       premiumOnly: false,
@@ -237,7 +296,6 @@ async function storeEvents(events, city) {
       recurringDay: event.recurringDay || null,
       confidence: event.confidence || 'medium',
       scoutedAt: now.toISOString(),
-      // TTL: recurring events last 7 days, one-time events last until their date + 1 day
       expiresAt: new Date(now.getTime() + (event.recurring ? 7 : 14) * 24 * 60 * 60 * 1000).toISOString(),
     };
 
@@ -285,56 +343,64 @@ export default async function handler(req, res) {
   }
 
   const city = req.query?.city || req.body?.city || 'Chicago, IL';
-  const dayOfWeek = new Date().getDay();
 
-  console.log(`🔍 Event Scout starting for ${city} (day ${dayOfWeek})`);
+  console.log(`🔍 Event Scout starting for ${city}`);
 
   try {
-    // Step 1: Get search queries for today
-    const queries = getSearchQueries(city, dayOfWeek);
-    console.log(`📋 ${queries.length} search queries`);
+    // Step 1: Get event source URLs for this city
+    const sources = getEventSources(city);
+    console.log(`📋 ${sources.length} event sources to scrape`);
 
-    // Step 2: Search the web (parallel, 4 at a time to respect rate limits)
-    const allResults = [];
-    for (let i = 0; i < queries.length; i += 4) {
-      const batch = queries.slice(i, i + 4);
-      const results = await Promise.all(batch.map(q => searchWeb(q)));
-      allResults.push(...results.flat());
+    // Step 2: Fetch all pages in parallel (max 4 at a time)
+    const allPages = [];
+    for (let i = 0; i < sources.length; i += 4) {
+      const batch = sources.slice(i, i + 4);
+      const results = await Promise.all(batch.map(s => fetchPage(s)));
+      allPages.push(...results.filter(Boolean));
     }
-    console.log(`🌐 ${allResults.length} raw search results`);
+    console.log(`🌐 ${allPages.length} pages fetched successfully`);
 
-    // Step 3: Deduplicate by URL
-    const seen = new Set();
-    const unique = allResults.filter(r => {
-      const key = r.link?.toLowerCase() || r.title?.toLowerCase();
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    console.log(`📝 ${unique.length} unique results after dedup`);
+    if (allPages.length === 0) {
+      return res.status(200).json({
+        success: true,
+        city,
+        searched: sources.length,
+        fetched: 0,
+        extracted: 0,
+        stored: 0,
+        cleaned: 0,
+        events: [],
+        note: 'No pages could be fetched — sources may be blocking requests',
+      });
+    }
 
-    // Step 4: Extract events with Claude
-    const events = await extractEvents(unique, city);
-    console.log(`🎯 ${events.length} events extracted by AI`);
+    // Step 3: Extract events with Claude (send all pages at once for dedup)
+    const events = await extractEvents(allPages, city);
 
-    // Step 5: Store in Firestore
+    // Step 4: Store in Firestore
     const stored = await storeEvents(events, city);
 
-    // Step 6: Cleanup expired events
+    // Step 5: Cleanup expired events
     const cleaned = await cleanupExpired();
 
     return res.status(200).json({
       success: true,
       city,
-      searched: queries.length,
-      rawResults: unique.length,
+      searched: sources.length,
+      fetched: allPages.length,
       extracted: events.length,
       stored,
       cleaned,
-      events: events.map(e => ({ title: e.title, venue: e.venue, date: e.date, category: e.category })),
+      events: events.map(e => ({
+        title: e.title,
+        venue: e.venue,
+        date: e.date,
+        category: e.category,
+        recurring: e.recurring || false,
+      })),
     });
   } catch (err) {
-    console.error('Scout error:', err.message);
+    console.error('Scout error:', err);
     return res.status(500).json({ error: 'Scout failed', message: err.message });
   }
 }
