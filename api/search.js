@@ -832,7 +832,6 @@ export default async function handler(req, res) {
     const message = await Promise.race([aiTimeout, client.messages.create({
       model: tier === "premium" ? "claude-sonnet-4-20250514" : "claude-haiku-4-5-20251001",
       max_tokens: isPlanQuery ? 1400 : (tier === 'premium' ? 900 : 700),
-      system: "You are a restaurant recommendation API. You MUST respond with ONLY valid JSON — no markdown, no backticks, no explanation, no preamble, no thinking. Start your response with { and end with }. Never wrap in code fences.",
       messages: [
         {
           role: "user",
@@ -978,11 +977,11 @@ Reglas críticas:
           console.log("🔍 JSON recovery succeeded via regex");
         } else {
           console.error("No JSON with 'results' found in response");
-          return res.status(200).json({ summary: "Search hit a snag — try again", results: [] });
+          return res.status(200).json({ summary: "Search hit a snag — try again", results: [], _debug: `no_json|first80: ${clean.substring(0, 80)}` });
         }
       } catch (recoveryErr) {
         console.error("JSON recovery also failed:", recoveryErr.message);
-        return res.status(200).json({ summary: "Search hit a snag — try again", results: [] });
+        return res.status(200).json({ summary: "Search hit a snag — try again", results: [], _debug: `recovery_failed|${recoveryErr.message}|first80: ${clean.substring(0, 80)}` });
       }
     }
 
