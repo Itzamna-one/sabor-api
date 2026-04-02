@@ -831,7 +831,7 @@ export default async function handler(req, res) {
     );
     const message = await Promise.race([aiTimeout, client.messages.create({
       model: tier === "premium" ? "claude-sonnet-4-20250514" : "claude-haiku-4-5-20251001",
-      max_tokens: isPlanQuery ? 1400 : (tier === 'premium' ? 900 : 700),
+      max_tokens: isPlanQuery ? 1800 : (tier === 'premium' ? 1400 : 700),
       messages: [
         {
           role: "user",
