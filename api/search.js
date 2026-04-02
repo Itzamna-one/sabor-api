@@ -1013,10 +1013,11 @@ Reglas críticas:
       ? 'Search hit a snag — try again'
       : err.message;
 
-    return res.status(statusCode).json({
+    return res.status(200).json({
       error: "Search failed",
       message: userMessage,
       summary: userMessage,
+      _debug: `${errStatus}|${errType}|${err.message?.substring(0, 200)}`,
       results: [],
       status: errStatus,
       type: errType,
