@@ -825,7 +825,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    const message = await client.messages.create({
+    // 55s timeout to stay under Vercel's 60s limit
+    const aiTimeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Claude API timeout after 55s')), 55000)
+    );
+    const message = await Promise.race([aiTimeout, client.messages.create({
       model: tier === "premium" ? "claude-sonnet-4-20250514" : "claude-haiku-4-5-20251001",
       max_tokens: isPlanQuery ? 1400 : (tier === 'premium' ? 900 : 700),
       messages: [
@@ -934,8 +938,12 @@ Reglas críticas:
 - Escribe descripciones con SABOR — nada de frases genéricas como "gran ambiente" o "vale la pena". Nombra platillos, texturas, sabores específicos.${conSabor ? '\n- CON SABOR: Cada descripción DEBE incluir un puente cultural latino — una comparación, sugerencia de complemento, o conexión de sabores con la cocina latina.' : ''}`,
         },
       ],
-    });
+    })]);
 
+    if (!message?.content?.[0]?.text) {
+      console.error("Claude returned empty response");
+      return res.status(200).json({ summary: "Search hit a snag — try again", results: [] });
+    }
     const raw = message.content[0].text.trim();
     const clean = raw.replace(/^```json\n?|^```\n?|\n?```$/g, "").trim();
 
@@ -950,11 +958,12 @@ Reglas críticas:
         if (jsonMatch) {
           parsed = JSON.parse(jsonMatch[0]);
         } else {
-          return res.status(500).json({ error: "AI response parse error", hint: "Response was not valid JSON" });
+          console.error("No JSON found in AI response");
+          return res.status(200).json({ summary: "Search hit a snag — try again", results: [] });
         }
       } catch (recoveryErr) {
         console.error("JSON recovery also failed:", recoveryErr.message);
-        return res.status(500).json({ error: "AI response parse error", hint: "Could not extract valid JSON from response" });
+        return res.status(200).json({ summary: "Search hit a snag — try again", results: [] });
       }
     }
 
