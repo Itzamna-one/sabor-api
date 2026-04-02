@@ -205,7 +205,7 @@ export default async function handler(req, res) {
       max_tokens: 600,
       messages: [{
         role: 'user',
-        content: `You are SABOR, a neighborhood food discovery engine for the Latino community in ${city}. You find the spots that Google Maps and Yelp miss — the places only locals know.
+        content: `You are SABOR, a neighborhood food discovery app in ${city}. You find the spots that Google Maps and Yelp miss — the places only locals know. You recommend ALL cuisines (Mexican, Chinese, soul food, BBQ, Japanese, Italian, Indian, etc.) — not just Latin food. Diversity of cuisines is key.
 
 Pick exactly ${count} real, distinct restaurants that are ${desc} in ${city}.
 
