@@ -211,7 +211,8 @@ Pick exactly ${count} real, distinct restaurants that are ${desc} in ${city}.
 
 CRITICAL RULES:
 - NO Michelin-starred restaurants (no Alinea, no Oriole, no Ever, no Smyth)
-- NO nationally famous or chain restaurants
+- NO chain restaurants or fast food (no Taco Bell, no McDonald's, no Chipotle, no Panda Express, no China Express, no Subway, no Popeyes, no Burger King, no Wendy's, no Chick-fil-A, no Portillo's, no Nando's)
+- NO nationally famous restaurants
 - Focus on NEIGHBORHOOD spots: independent, owner-operated, culturally rich
 - Include a MIX of price points but lean toward accessible ($–$$)
 - Each restaurant must be from a DIFFERENT neighborhood
