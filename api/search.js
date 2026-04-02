@@ -401,11 +401,47 @@ function resolveChicagoNeighborhood(address) {
     return 'Roseland';
   }
 
+  // 60638 — Clearing / Garfield Ridge
+  if (zip === '60638') {
+    if (/\b63rd\b|\bcicero\b|\bcentral\b/.test(streetLower)) return 'Clearing';
+    return 'Garfield Ridge';
+  }
+
+  // 60652 — Ashburn / West Beverly / Clearing (south)
+  if (zip === '60652') return 'Ashburn';
+
+  // 60655 — Mount Greenwood
+  if (zip === '60655') return 'Mount Greenwood';
+
+  // 60643 — Morgan Park / Beverly
+  if (zip === '60643') {
+    if (/\bwestern\b|\b103rd\b|\b104th\b|\b105th\b/.test(streetLower)) return 'Beverly';
+    return 'Morgan Park';
+  }
+
+  // 60636 — West Englewood (confirm present)
+  if (zip === '60636') return 'West Englewood';
+
+  // 60624 — East Garfield Park
+  if (zip === '60624') return 'East Garfield Park';
+
+  // 60644 covers Austin AND West Garfield Park — disambiguate
+  // (already have 60644 → Austin above, add Garfield Park check)
+
+  // 60612 — Near West Side / West Garfield Park (east end)
+  if (zip === '60612') {
+    if (/\bpulaski\b|\bkostner\b|\bkildare\b/.test(streetLower)) return 'West Garfield Park';
+    return 'Near West Side';
+  }
+
   // ── Chicago suburbs (by ZIP) ──
   if (zip === '60804' || zip === '60805') return 'Cicero';
   if (zip === '60402') return 'Berwyn';
   if (zip === '60201' || zip === '60202') return 'Evanston';
   if (zip === '60173' || zip === '60194') return 'Schaumburg';
+  if (zip === '60453' || zip === '60454') return 'Oak Lawn';
+  if (zip === '60805') return 'Evergreen Park';
+  if (zip === '60459') return 'Burbank';
 
   // ── Indiana (by ZIP prefix) ──
   if (zip && zip.startsWith('460')) return null; // Indianapolis — let Google handle
