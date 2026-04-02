@@ -720,12 +720,18 @@ export default async function handler(req, res) {
   let neighborhoodContext = "";
   if (isPremium && filterNeighborhood) {
     const vibe = NEIGHBORHOOD_VIBES[filterNeighborhood] || "";
-    neighborhoodContext = `El usuario filtra por: ${filterNeighborhood} (conocido por: ${vibe}). Todos los resultados deben ser de este barrio.`;
+    neighborhoodContext = language === 'en'
+      ? `The user is filtering by: ${filterNeighborhood} (known for: ${vibe}). ALL results must be from this neighborhood.`
+      : `El usuario filtra por: ${filterNeighborhood} (conocido por: ${vibe}). Todos los resultados deben ser de este barrio.`;
   } else if (currentNeighborhood) {
     const vibe = NEIGHBORHOOD_VIBES[currentNeighborhood] || "";
-    neighborhoodContext = `El usuario está en: ${currentNeighborhood} (${vibe}). Radio: ${tierConfig.radius}.`;
+    neighborhoodContext = language === 'en'
+      ? `The user is currently in ${currentNeighborhood} (${vibe}). PRIORITIZE spots near ${currentNeighborhood} and neighboring areas to minimize travel time. Start with the closest options first, then expand outward. At least half the results should be within 15 minutes of ${currentNeighborhood}.`
+      : `El usuario está en ${currentNeighborhood} (${vibe}). PRIORIZA spots cerca de ${currentNeighborhood} y barrios vecinos para minimizar tiempo de viaje. Empieza con las opciones más cercanas, luego expande. Al menos la mitad de los resultados deben estar a 15 minutos de ${currentNeighborhood}.`;
     if (isPremium && safeFavoriteNeighborhoods.length > 0) {
-      neighborhoodContext += ` Sus barrios favoritos: ${safeFavoriteNeighborhoods.join(", ")}.`;
+      neighborhoodContext += language === 'en'
+        ? ` Favorite neighborhoods: ${safeFavoriteNeighborhoods.join(", ")}.`
+        : ` Barrios favoritos: ${safeFavoriteNeighborhoods.join(", ")}.`;
     }
   }
 
