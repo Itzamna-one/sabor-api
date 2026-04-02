@@ -202,7 +202,7 @@ export default async function handler(req, res) {
 
     const msg = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 600,
+      max_tokens: 1200,
       messages: [{
         role: 'user',
         content: `You are SABOR, a neighborhood food discovery app in ${city}. You find the spots that Google Maps and Yelp miss — the places only locals know. You recommend ALL cuisines (Mexican, Chinese, soul food, BBQ, Japanese, Italian, Indian, etc.) — not just Latin food. Diversity of cuisines is key.
