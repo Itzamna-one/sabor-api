@@ -5,18 +5,18 @@ const cache = new Map();
 const CACHE_TTL = 300000; // 5 minutes
 
 const SECTION_PROMPTS = {
-  en_fuego:        'the most on-fire, buzzing, hottest right now restaurants',
-  joyas_ocultas:   'the best hidden gem / under-the-radar local restaurants',
-  subiendo_fuerte: 'the fastest rising, newest trending restaurants',
-  nuevos_spots:    'the newest restaurant openings',
-  los_mejores:     'the highest-rated, most acclaimed restaurants',
-  tu_barrio:       'the best neighborhood, local-favorite restaurants',
-  hot:             'the most on-fire, buzzing, hottest right now restaurants',
-  gems:            'the best hidden gem / under-the-radar local restaurants',
-  trending:        'the fastest rising, newest trending restaurants',
-  new:             'the newest restaurant openings',
-  rated:           'the highest-rated, most acclaimed restaurants',
-  local:           'the best neighborhood, local-favorite restaurants',
+  en_fuego:        'the most buzzing, talked-about restaurants in local neighborhoods right now — places people are discovering on social media and word of mouth. NOT Michelin-starred or nationally famous fine dining',
+  joyas_ocultas:   'the best hidden gem / under-the-radar local restaurants that most people walk past — the kind of spot only neighborhood regulars know about. Must be $–$$ price range',
+  subiendo_fuerte: 'the fastest rising, newest trending restaurants that locals are excited about — NOT already-famous places',
+  nuevos_spots:    'the newest restaurant openings in the last few months that are worth checking out',
+  los_mejores:     'the highest-rated neighborhood restaurants loved by locals — NOT nationally famous or Michelin-starred',
+  tu_barrio:       'the best neighborhood, local-favorite restaurants — the places that define their barrio',
+  hot:             'the most buzzing, talked-about restaurants in local neighborhoods right now — places people are discovering on social media and word of mouth. NOT Michelin-starred or nationally famous fine dining',
+  gems:            'the best hidden gem / under-the-radar local restaurants that most people walk past — the kind of spot only neighborhood regulars know about. Must be $–$$ price range',
+  trending:        'the fastest rising, newest trending restaurants that locals are excited about — NOT already-famous places',
+  new:             'the newest restaurant openings in the last few months that are worth checking out',
+  rated:           'the highest-rated neighborhood restaurants loved by locals — NOT nationally famous or Michelin-starred',
+  local:           'the best neighborhood, local-favorite restaurants — the places that define their barrio',
 };
 
 // Fallback data when Claude is unavailable
@@ -77,10 +77,17 @@ function getCityGeo(city) {
 }
 
 // ─── Google Places enrichment (with geo-bias) ───
-async function getPlaceDetails(name, city, apiKey) {
+async function getPlaceDetails(name, city, apiKey, userLat, userLng) {
   try {
+    // Use user's GPS if available, otherwise fall back to city center
+    const geoCenter = (userLat && userLng)
+      ? { latitude: userLat, longitude: userLng }
+      : { latitude: getCityGeo(city).lat, longitude: getCityGeo(city).lng };
+    // Tighter radius when we have user GPS (15km vs 50km)
+    const geoRadius = (userLat && userLng) ? 15000 : 50000;
+
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout
+    const timeout = setTimeout(() => controller.abort(), 8000);
     const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
       method: 'POST',
       signal: controller.signal,
@@ -94,8 +101,8 @@ async function getPlaceDetails(name, city, apiKey) {
         maxResultCount: 1,
         locationBias: {
           circle: {
-            center: { latitude: getCityGeo(city).lat, longitude: getCityGeo(city).lng },
-            radius: 50000,
+            center: geoCenter,
+            radius: geoRadius,
           },
         },
       }),
@@ -136,12 +143,33 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 's-maxage=300'); // CDN cache 5 min
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const city = req.query.city || 'Chicago';
-  const section = req.query.section || 'en_fuego';
-  const count = parseInt(req.query.count || '3', 10);
+  // Support both GET params and POST body for personalization
+  let city, section, count, diets, cuisines, neighborhood, userLat, userLng;
+  if (req.method === 'POST') {
+    const body = req.body || {};
+    city = body.city || 'Chicago';
+    section = body.section || 'hot';
+    count = parseInt(body.count || '6', 10);
+    diets = body.diets || [];
+    cuisines = body.cuisines || [];
+    neighborhood = body.neighborhood || null;
+    userLat = body.lat || null;
+    userLng = body.lng || null;
+  } else {
+    city = req.query.city || 'Chicago';
+    section = req.query.section || 'en_fuego';
+    count = parseInt(req.query.count || '3', 10);
+    diets = [];
+    cuisines = [];
+    neighborhood = null;
+    userLat = null;
+    userLng = null;
+  }
 
-  // Check cache
-  const key = `${city}:${section}:${count}`;
+  // Check cache (include neighborhood so location-aware results are cached separately)
+  const dietKey = diets.length ? diets.sort().join(',') : 'none';
+  const hoodKey = neighborhood || 'citywide';
+  const key = `${city}:${section}:${count}:${dietKey}:${hoodKey}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.ts < CACHE_TTL) {
     return res.status(200).json(hit.data);
@@ -152,13 +180,24 @@ export default async function handler(req, res) {
   if (!ak) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set' });
   if (!pk) return res.status(500).json({ error: 'GOOGLE_PLACES_KEY not set' });
 
-  const desc = SECTION_PROMPTS[section] || SECTION_PROMPTS.en_fuego;
+  const desc = SECTION_PROMPTS[section] || SECTION_PROMPTS.hot;
+
+  // Build personalization context
+  const dietContext = diets.length
+    ? `The user has these dietary preferences: ${diets.join(', ')}. At least 2 of your picks MUST accommodate these diets (vegan options, gluten-free menu, etc). Label which ones are diet-friendly in the vibe field.`
+    : '';
+  const cuisineContext = cuisines.length
+    ? `The user loves these cuisines: ${cuisines.join(', ')}. Lean toward these when possible but still include variety.`
+    : '';
+  const hoodContext = neighborhood
+    ? `The user is currently in ${neighborhood}. AT LEAST HALF of your picks (${Math.ceil(count/2)} of ${count}) MUST be in or within 10 minutes of ${neighborhood}. The remaining picks can be from nearby neighborhoods. Do NOT scatter results across the entire city — this user wants spots near them.`
+    : '';
 
   let restaurants;
   try {
     const anthropic = new Anthropic({ apiKey: ak });
     const exampleItems = Array.from({ length: count }, (_, i) =>
-      `{"name":"Restaurant ${i + 1}","cuisine":"Cuisine","emoji":"🌮","vibe":"Vibe"}`
+      `{"name":"Restaurant ${i + 1}","cuisine":"Cuisine","emoji":"🌮","vibe":"Vibe · $–$$"}`
     ).join(',');
 
     const msg = await anthropic.messages.create({
@@ -166,7 +205,23 @@ export default async function handler(req, res) {
       max_tokens: 600,
       messages: [{
         role: 'user',
-        content: `You are a local food expert for ${city}. Pick exactly ${count} real, distinct restaurants that are ${desc} in ${city}. Each must be a different restaurant. Respond ONLY with valid JSON, no markdown: {"restaurants":[${exampleItems}]}`,
+        content: `You are SABOR, a neighborhood food discovery engine for the Latino community in ${city}. You find the spots that Google Maps and Yelp miss — the places only locals know.
+
+Pick exactly ${count} real, distinct restaurants that are ${desc} in ${city}.
+
+CRITICAL RULES:
+- NO Michelin-starred restaurants (no Alinea, no Oriole, no Ever, no Smyth)
+- NO nationally famous or chain restaurants
+- Focus on NEIGHBORHOOD spots: independent, owner-operated, culturally rich
+- Include a MIX of price points but lean toward accessible ($–$$)
+- Each restaurant must be from a DIFFERENT neighborhood
+- Include the neighborhood name in the vibe field (e.g. "Pilsen · Authentic · $")
+- Prioritize places with character, story, or cultural significance
+${dietContext}
+${cuisineContext}
+${hoodContext}
+
+Respond ONLY with valid JSON, no markdown: {"restaurants":[${exampleItems}]}`,
       }],
     });
 
@@ -197,7 +252,7 @@ export default async function handler(req, res) {
       cuisine: r.cuisine,
       emoji: r.emoji,
       vibe: r.vibe,
-      places: await getPlaceDetails(r.name, city, pk),
+      places: await getPlaceDetails(r.name, city, pk, userLat, userLng),
     }))
   );
 

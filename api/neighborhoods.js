@@ -6,18 +6,35 @@ const CITY_NEIGHBORHOODS = {
   // ILLINOIS
   // ═══════════════════════════════════════
   'Chicago, IL': [
+    // ── West / Southwest ──
     { name: 'Pilsen',            emoji: '🌮', vibe: 'Murals · Mexican Classics' },
     { name: 'Little Village',    emoji: '🔥', vibe: 'Auténtico · Mercados' },
     { name: 'Humboldt Park',     emoji: '🇵🇷', vibe: 'Boricua · Jibaritos' },
+    { name: 'Back of the Yards', emoji: '💎', vibe: 'Hidden Gems · Local' },
+    { name: 'Brighton Park',     emoji: '🌮', vibe: 'Mexican · Family' },
+    { name: 'Gage Park',         emoji: '🔥', vibe: 'Taquerías · Authentic' },
+    { name: 'Archer Heights',    emoji: '🌯', vibe: 'Polish-Mexican · Local' },
+    { name: 'Marquette Park',    emoji: '💎', vibe: 'Hidden · Neighborhood' },
+    // ── North / Northwest ──
     { name: 'Logan Square',      emoji: '🍜', vibe: 'Trendy · Fusion' },
     { name: 'Wicker Park',       emoji: '📸', vibe: 'Brunch · Eclectic' },
-    { name: 'Back of the Yards', emoji: '💎', vibe: 'Hidden Gems · Local' },
-    { name: 'West Loop',         emoji: '🥩', vibe: 'Chef-Driven · Fine Dining' },
-    { name: 'Chinatown',         emoji: '🥟', vibe: 'Dim Sum · Hot Pot' },
     { name: 'Albany Park',       emoji: '🌍', vibe: 'Most Diverse · Global' },
-    { name: 'Bronzeville',       emoji: '🍗', vibe: 'Soul Food · Bold Flavors' },
     { name: 'Devon Ave',         emoji: '🍛', vibe: 'South Asian · Biryani' },
     { name: 'Uptown',            emoji: '🍲', vibe: 'Vietnamese · Ethiopian' },
+    { name: 'Lakeview',          emoji: '🍣', vibe: 'Ramen · Thai · Brunch' },
+    { name: 'Lincoln Park',      emoji: '🍷', vibe: 'Upscale · Date Night' },
+    { name: 'Andersonville',     emoji: '🌍', vibe: 'International · Ethiopian' },
+    { name: 'Rogers Park',       emoji: '🌮', vibe: 'Jamaican · Mexican · Diverse' },
+    // ── South Side ──
+    { name: 'Bridgeport',        emoji: '🥟', vibe: 'Local Gems · Chinese · Italian' },
+    { name: 'Chinatown',         emoji: '🥟', vibe: 'Dim Sum · Hot Pot' },
+    { name: 'Bronzeville',       emoji: '🍗', vibe: 'Soul Food · Bold Flavors' },
+    { name: 'Hyde Park',         emoji: '🍛', vibe: 'Campus · Diverse · Soul Food' },
+    { name: 'South Chicago',     emoji: '🌮', vibe: 'Traditional Mexican · Seafood' },
+    { name: 'Chatham',           emoji: '🍗', vibe: 'Soul Food · BBQ · Comfort' },
+    // ── Downtown / Near ──
+    { name: 'West Loop',         emoji: '🥩', vibe: 'Chef-Driven · Randolph Row' },
+    { name: 'West Town',         emoji: '✨', vibe: 'Young Chefs · Creative' },
   ],
   'Aurora, IL': [
     { name: 'Downtown Aurora',   emoji: '🌮', vibe: 'Latin Main Street' },
