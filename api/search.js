@@ -956,7 +956,12 @@ Reglas críticas:
     // Looks up each restaurant NAME in Google → gets REAL address + neighborhood
     // This fixes AI-hallucinated addresses AND neighborhoods in one shot
     if (parsed.results) {
-      parsed.results = await verifyNeighborhoods(parsed.results, city);
+      try {
+        parsed.results = await verifyNeighborhoods(parsed.results, city);
+      } catch (verifyErr) {
+        console.error('Neighborhood verification failed (returning unverified):', verifyErr.message);
+        // Return results without verification rather than 500
+      }
     }
 
     if (!skipCache) setCache(cacheKey, parsed);
@@ -965,9 +970,20 @@ Reglas críticas:
     const errStatus = err.status || err.statusCode || null;
     const errType = err.error?.error?.type || err.type || null;
     console.error(`SABOR API error [${errStatus}] [${errType}]:`, err.message, JSON.stringify(err.error || {}).substring(0, 500));
-    return res.status(errStatus === 529 ? 503 : 500).json({
+
+    // Return a user-friendly error with a retry hint instead of raw 500
+    const statusCode = errStatus === 529 ? 503 : 500;
+    const userMessage = errType === 'overloaded_error'
+      ? 'AI is busy — try again in a moment'
+      : statusCode === 500
+      ? 'Search hit a snag — try again'
+      : err.message;
+
+    return res.status(statusCode).json({
       error: "Search failed",
-      message: errType === 'overloaded_error' ? 'AI is busy — try again in a moment' : err.message,
+      message: userMessage,
+      summary: userMessage,
+      results: [],
       status: errStatus,
       type: errType,
     });
