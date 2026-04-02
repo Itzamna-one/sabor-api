@@ -830,8 +830,9 @@ export default async function handler(req, res) {
       setTimeout(() => reject(new Error('Claude API timeout after 55s')), 55000)
     );
     const message = await Promise.race([aiTimeout, client.messages.create({
-      model: tier === "premium" ? "claude-sonnet-4-6-20250415" : "claude-haiku-4-5-20251001",
+      model: tier === "premium" ? "claude-sonnet-4-20250514" : "claude-haiku-4-5-20251001",
       max_tokens: isPlanQuery ? 1400 : (tier === 'premium' ? 900 : 700),
+      system: "You are a restaurant recommendation API. You MUST respond with ONLY valid JSON — no markdown, no backticks, no explanation, no preamble, no thinking. Start your response with { and end with }. Never wrap in code fences.",
       messages: [
         {
           role: "user",
