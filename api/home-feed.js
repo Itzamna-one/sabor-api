@@ -138,6 +138,83 @@ async function getPlaceDetails(name, city, apiKey, userLat, userLng) {
   }
 }
 
+// ─── Neighborhood resolver (matches search.js) ───
+function resolveNeighborhood(address) {
+  if (!address) return null;
+  const addr = address.toLowerCase();
+  const zipMatch = addr.match(/\b(6\d{4}|460\d{2}|462\d{2}|463\d{2}|464\d{2})\b/);
+  const zip = zipMatch ? zipMatch[1] : null;
+  const numMatch = addr.match(/^(\d+)\s/);
+  const streetNum = numMatch ? parseInt(numMatch[1]) : null;
+  const s = addr;
+
+  // Street-level disambiguation for major corridors
+  if (streetNum && /\bpulaski\b/.test(s)) {
+    if (streetNum >= 6300) return 'Chicago Lawn';
+    if (streetNum >= 4300) return 'Archer Heights';
+    if (streetNum >= 2200) return 'Little Village';
+    if (streetNum >= 800) return 'North Lawndale';
+    return 'Humboldt Park';
+  }
+
+  // ZIP-based resolution
+  const ZIP_MAP = {
+    '60608': () => /\bwentworth\b|\barcher\b/.test(s) ? 'Chinatown' : /\b3[1-5]/.test(s) ? 'Bridgeport' : 'Pilsen',
+    '60616': () => /\bwentworth\b|\barcher\b/.test(s) ? 'Chinatown' : /\bking\b|\bcottage\b/.test(s) ? 'Bronzeville' : 'Bridgeport',
+    '60623': () => 'Little Village',
+    '60622': () => /\bmilwaukee\b|\bdamen\b/.test(s) ? 'Wicker Park' : /\bdivision\b/.test(s) ? 'Ukrainian Village' : 'West Town',
+    '60647': () => /\bnorth\s+ave\b|\bdamen\b/.test(s) ? 'Bucktown' : 'Logan Square',
+    '60607': () => 'West Loop',
+    '60654': () => 'River North',
+    '60614': () => 'Lincoln Park',
+    '60657': () => /\bhalsted\b|\bbroadway\b/.test(s) ? 'Boystown' : 'Lakeview',
+    '60613': () => 'Lakeview',
+    '60640': () => /\bclark\b/.test(s) ? 'Andersonville' : 'Uptown',
+    '60626': () => 'Rogers Park',
+    '60659': () => 'Devon Ave',
+    '60625': () => 'Albany Park',
+    '60618': () => 'North Center',
+    '60609': () => 'Back of the Yards',
+    '60632': () => /\barcher\b/.test(s) ? 'Archer Heights' : 'Brighton Park',
+    '60629': () => 'Chicago Lawn',
+    '60636': () => 'West Englewood',
+    '60615': () => 'Hyde Park',
+    '60637': () => 'Hyde Park',
+    '60624': () => /\bdivision\b|\bnorth\b/.test(s) ? 'Humboldt Park' : 'East Garfield Park',
+    '60651': () => 'Humboldt Park',
+    '60639': () => 'Belmont Cragin',
+    '60641': () => /\birving\b/.test(s) ? 'Old Irving Park' : 'Portage Park',
+    '60605': () => 'South Loop',
+    '60601': () => 'The Loop', '60602': () => 'The Loop', '60603': () => 'The Loop', '60604': () => 'The Loop',
+    '60611': () => 'Streeterville',
+    '60660': () => 'Edgewater',
+    '60653': () => 'Bronzeville',
+    '60619': () => 'Chatham',
+    '60620': () => 'Auburn Gresham',
+    '60617': () => 'South Chicago',
+    '60649': () => 'South Shore',
+    '60621': () => 'Englewood',
+    '60628': () => /\bpullman\b|\b111th\b/.test(s) ? 'Pullman' : 'Roseland',
+    '60638': () => /\b63rd\b|\bcicero\b/.test(s) ? 'Clearing' : 'Garfield Ridge',
+    '60652': () => 'Ashburn',
+    '60655': () => 'Mount Greenwood',
+    '60643': () => /\bwestern\b/.test(s) ? 'Beverly' : 'Morgan Park',
+    '60644': () => 'Austin',
+    '60612': () => /\bpulaski\b|\bkostner\b/.test(s) ? 'West Garfield Park' : 'Near West Side',
+    '60630': () => 'Jefferson Park',
+    '60634': () => 'Dunning',
+    // Suburbs
+    '60804': () => 'Cicero', '60805': () => 'Cicero',
+    '60402': () => 'Berwyn',
+    '60201': () => 'Evanston', '60202': () => 'Evanston',
+    '60453': () => 'Oak Lawn', '60454': () => 'Oak Lawn',
+    '60459': () => 'Burbank',
+  };
+
+  if (zip && ZIP_MAP[zip]) return ZIP_MAP[zip]();
+  return null;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Cache-Control', 's-maxage=300'); // CDN cache 5 min
@@ -245,16 +322,25 @@ Respond ONLY with valid JSON, no markdown: {"restaurants":[${exampleItems}]}`,
     restaurants = (FALLBACK_RESTAURANTS[cityKey] || FALLBACK_RESTAURANTS.chicago).slice(0, count);
   }
 
-  // Enrich with Google Places
+  // Enrich with Google Places + resolve real neighborhoods
   const items = await Promise.all(
-    restaurants.map(async (r) => ({
-      name: r.name,
-      displayName: r.name,
-      cuisine: r.cuisine,
-      emoji: r.emoji,
-      vibe: r.vibe,
-      places: await getPlaceDetails(r.name, city, pk, userLat, userLng),
-    }))
+    restaurants.map(async (r) => {
+      const places = await getPlaceDetails(r.name, city, pk, userLat, userLng);
+      // Override Claude's guessed neighborhood with verified one from address
+      const resolvedHood = places?.address ? resolveNeighborhood(places.address) : null;
+      const vibe = resolvedHood
+        ? r.vibe.replace(/^[^·]*·/, `${resolvedHood} ·`)  // replace first part of vibe with real hood
+        : r.vibe;
+      return {
+        name: r.name,
+        displayName: resolvedHood ? `${r.name} — ${resolvedHood}` : r.name,
+        cuisine: r.cuisine,
+        emoji: r.emoji,
+        vibe: vibe,
+        neighborhood: resolvedHood || null,
+        places,
+      };
+    })
   );
 
   const data = { items };
