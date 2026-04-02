@@ -941,24 +941,42 @@ Reglas críticas:
     })]);
 
     if (!message?.content?.[0]?.text) {
-      console.error("Claude returned empty response");
+      console.error("Claude returned empty response — content:", JSON.stringify(message?.content));
       return res.status(200).json({ summary: "Search hit a snag — try again", results: [] });
     }
     const raw = message.content[0].text.trim();
-    const clean = raw.replace(/^```json\n?|^```\n?|\n?```$/g, "").trim();
+    console.log(`🔍 AI response length: ${raw.length} chars, model: ${tier === "premium" ? "sonnet" : "haiku"}, starts with: ${raw.substring(0, 80)}`);
+
+    // Aggressive cleanup: remove markdown fences, thinking tags, preamble text before JSON
+    let clean = raw
+      .replace(/^```json\n?/gm, '')
+      .replace(/^```\n?/gm, '')
+      .replace(/\n?```$/gm, '')
+      .replace(/<thinking>[\s\S]*?<\/thinking>/g, '') // remove thinking tags
+      .trim();
+
+    // If response doesn't start with {, try to find the JSON object
+    if (!clean.startsWith('{')) {
+      const jsonStart = clean.indexOf('{"');
+      if (jsonStart !== -1) {
+        console.log(`🔍 Trimming ${jsonStart} chars of preamble before JSON`);
+        clean = clean.substring(jsonStart);
+      }
+    }
 
     let parsed;
     try {
       parsed = JSON.parse(clean);
     } catch (parseErr) {
-      console.error("JSON parse failed. Raw AI response:", raw.substring(0, 500));
-      // Attempt recovery: extract JSON object from response
+      console.error("JSON parse failed. First 500 chars:", clean.substring(0, 500));
+      // Attempt recovery: extract the largest JSON object
       try {
-        const jsonMatch = clean.match(/\{[\s\S]*\}/);
+        const jsonMatch = clean.match(/\{[\s\S]*"results"[\s\S]*\}/);
         if (jsonMatch) {
           parsed = JSON.parse(jsonMatch[0]);
+          console.log("🔍 JSON recovery succeeded via regex");
         } else {
-          console.error("No JSON found in AI response");
+          console.error("No JSON with 'results' found in response");
           return res.status(200).json({ summary: "Search hit a snag — try again", results: [] });
         }
       } catch (recoveryErr) {
