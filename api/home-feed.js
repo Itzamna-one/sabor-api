@@ -187,7 +187,7 @@ export default async function handler(req, res) {
     ? `The user has these dietary preferences: ${diets.join(', ')}. At least 2 of your picks MUST accommodate these diets (vegan options, gluten-free menu, etc). Label which ones are diet-friendly in the vibe field.`
     : '';
   const cuisineContext = cuisines.length
-    ? `The user loves these cuisines: ${cuisines.join(', ')}. Lean toward these when possible but still include variety.`
+    ? `The user enjoys ${cuisines.join(', ')} but wants to discover ALL types of food. Include at most 2 of their preferred cuisines — the rest MUST be different cuisines they haven't tried (soul food, BBQ, Chinese, Thai, Indian, Japanese, Italian, etc).`
     : '';
   const hoodContext = neighborhood
     ? `The user is currently in ${neighborhood}. AT LEAST HALF of your picks (${Math.ceil(count/2)} of ${count}) MUST be in or within 10 minutes of ${neighborhood}. The remaining picks can be from nearby neighborhoods. Do NOT scatter results across the entire city — this user wants spots near them.`
