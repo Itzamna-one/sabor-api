@@ -10,11 +10,14 @@ const CITY_NEIGHBORHOODS = {
     { name: 'Pilsen',            emoji: '🌮', vibe: 'Murals · Mexican Classics' },
     { name: 'Little Village',    emoji: '🔥', vibe: 'Auténtico · Mercados' },
     { name: 'Humboldt Park',     emoji: '🇵🇷', vibe: 'Boricua · Jibaritos' },
+    { name: 'East Garfield Park', emoji: '💎', vibe: 'Soul Food · Local · Emerging' },
+    { name: 'West Garfield Park', emoji: '🍗', vibe: 'BBQ · Comfort · Hidden' },
     { name: 'Back of the Yards', emoji: '💎', vibe: 'Hidden Gems · Local' },
     { name: 'Brighton Park',     emoji: '🌮', vibe: 'Mexican · Family' },
     { name: 'Gage Park',         emoji: '🔥', vibe: 'Taquerías · Authentic' },
     { name: 'Archer Heights',    emoji: '🌯', vibe: 'Polish-Mexican · Local' },
     { name: 'Marquette Park',    emoji: '💎', vibe: 'Hidden · Neighborhood' },
+    { name: 'Chicago Lawn',      emoji: '🌮', vibe: 'Mexican · Middle Eastern' },
     // ── North / Northwest ──
     { name: 'Logan Square',      emoji: '🍜', vibe: 'Trendy · Fusion' },
     { name: 'Wicker Park',       emoji: '📸', vibe: 'Brunch · Eclectic' },
@@ -25,6 +28,8 @@ const CITY_NEIGHBORHOODS = {
     { name: 'Lincoln Park',      emoji: '🍷', vibe: 'Upscale · Date Night' },
     { name: 'Andersonville',     emoji: '🌍', vibe: 'International · Ethiopian' },
     { name: 'Rogers Park',       emoji: '🌮', vibe: 'Jamaican · Mexican · Diverse' },
+    { name: 'Irving Park',       emoji: '🌮', vibe: 'Mexican · Korean · Local' },
+    { name: 'Portage Park',      emoji: '🍕', vibe: 'Polish · Italian · Family' },
     // ── South Side ──
     { name: 'Bridgeport',        emoji: '🥟', vibe: 'Local Gems · Chinese · Italian' },
     { name: 'Chinatown',         emoji: '🥟', vibe: 'Dim Sum · Hot Pot' },
@@ -32,9 +37,22 @@ const CITY_NEIGHBORHOODS = {
     { name: 'Hyde Park',         emoji: '🍛', vibe: 'Campus · Diverse · Soul Food' },
     { name: 'South Chicago',     emoji: '🌮', vibe: 'Traditional Mexican · Seafood' },
     { name: 'Chatham',           emoji: '🍗', vibe: 'Soul Food · BBQ · Comfort' },
+    { name: 'Englewood',         emoji: '🍗', vibe: 'Soul Food · BBQ · Local' },
+    { name: 'Auburn Gresham',    emoji: '💎', vibe: 'Hidden · Comfort Food' },
+    { name: 'Roseland',          emoji: '🍗', vibe: 'BBQ · Fish · Comfort' },
+    { name: 'Pullman',           emoji: '✨', vibe: 'Historic · Emerging Eats' },
+    // ── Southwest Suburbs (in city limits) ──
+    { name: 'Clearing',          emoji: '🌮', vibe: 'Mexican · Polish · Local' },
+    { name: 'Garfield Ridge',    emoji: '🍔', vibe: 'Midway Area · Casual' },
+    // ── Near Southwest Suburbs ──
+    { name: 'Oak Lawn',          emoji: '🍽️', vibe: 'Diverse · Family · Arabic' },
+    { name: 'Berwyn',            emoji: '🌮', vibe: 'Mexican-Czech · Cermak Rd' },
+    { name: 'Cicero',            emoji: '🔥', vibe: 'Little Mexico · Antojitos' },
+    { name: 'Evergreen Park',    emoji: '🍔', vibe: 'Local · Family Dining' },
     // ── Downtown / Near ──
     { name: 'West Loop',         emoji: '🥩', vibe: 'Chef-Driven · Randolph Row' },
     { name: 'West Town',         emoji: '✨', vibe: 'Young Chefs · Creative' },
+    { name: 'River North',       emoji: '🍸', vibe: 'Nightlife · Steakhouses' },
   ],
   'Aurora, IL': [
     { name: 'Downtown Aurora',   emoji: '🌮', vibe: 'Latin Main Street' },
