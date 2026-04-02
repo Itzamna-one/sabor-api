@@ -977,11 +977,11 @@ Reglas críticas:
           console.log("🔍 JSON recovery succeeded via regex");
         } else {
           console.error("No JSON with 'results' found in response");
-          return res.status(200).json({ summary: "Search hit a snag — try again", results: [], _debug: `no_json|first80: ${clean.substring(0, 80)}` });
+          return res.status(200).json({ summary: "Search hit a snag — try again", results: [] });
         }
       } catch (recoveryErr) {
         console.error("JSON recovery also failed:", recoveryErr.message);
-        return res.status(200).json({ summary: "Search hit a snag — try again", results: [], _debug: `recovery_failed|${recoveryErr.message}|first80: ${clean.substring(0, 80)}` });
+        return res.status(200).json({ summary: "Search hit a snag — try again", results: [] });
       }
     }
 
@@ -1016,7 +1016,6 @@ Reglas críticas:
       error: "Search failed",
       message: userMessage,
       summary: userMessage,
-      _debug: `${errStatus}|${errType}|${err.message?.substring(0, 200)}`,
       results: [],
       status: errStatus,
       type: errType,
