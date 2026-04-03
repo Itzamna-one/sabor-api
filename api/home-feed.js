@@ -287,6 +287,7 @@ export default async function handler(req, res) {
 Pick exactly ${count} real, distinct restaurants that are ${desc} in ${city}.
 
 CRITICAL RULES:
+- ONLY REAL RESTAURANTS: Every restaurant MUST be a real business that exists on Google Maps RIGHT NOW. Use the EXACT business name as it appears on Google Maps or Yelp. Do NOT invent names. If you are not 95% sure a restaurant exists with that exact name in that neighborhood, pick one you ARE sure about.
 - NO Michelin-starred restaurants (no Alinea, no Oriole, no Ever, no Smyth)
 - NO chain restaurants or fast food (no Taco Bell, no McDonald's, no Chipotle, no Panda Express, no China Express, no Subway, no Popeyes, no Burger King, no Wendy's, no Chick-fil-A, no Portillo's, no Nando's)
 - NO nationally famous restaurants
@@ -295,6 +296,7 @@ CRITICAL RULES:
 - Each restaurant must be from a DIFFERENT neighborhood
 - Include the neighborhood name in the vibe field (e.g. "Pilsen · Authentic · $")
 - Prioritize places with character, story, or cultural significance
+- Do NOT place restaurants from other states or cities in Chicago neighborhoods. If you don't know enough restaurants in a specific neighborhood, pick from a nearby one instead of inventing.
 ${dietContext}
 ${cuisineContext}
 ${hoodContext}
@@ -343,7 +345,9 @@ Respond ONLY with valid JSON, no markdown: {"restaurants":[${exampleItems}]}`,
     })
   );
 
-  const data = { items };
+  // Filter out hallucinated restaurants that Google Places couldn't verify
+  const verified = items.filter(item => item.places != null);
+  const data = { items: verified.length > 0 ? verified : items }; // fallback to all if none verified
   cache.set(key, { ts: Date.now(), data });
   return res.status(200).json(data);
 }
