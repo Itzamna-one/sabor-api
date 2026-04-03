@@ -628,10 +628,10 @@ async function verifyNeighborhoods(results, city) {
           if (resolvedHood !== r.neighborhood) {
             console.log(`🏘️ ZIP resolver corrected: "${r.neighborhood}" → "${resolvedHood}" for ${r.name} (${r.address})`);
           }
-          r.neighborhood = shortenNeighborhood(resolvedHood);
-          // Update the name field to match verified neighborhood
+          const shortHood = shortenNeighborhood(resolvedHood);
+          r.neighborhood = shortHood;
           if (r.name && r.name.includes(' — ')) {
-            r.name = r.name.split(' — ')[0] + ' — ' + resolvedHood;
+            r.name = r.name.split(' — ')[0] + ' — ' + shortHood;
           }
           return r; // Trust AI's address + our resolver over Google name lookup
         }
@@ -644,10 +644,10 @@ async function verifyNeighborhoods(results, city) {
           if (realData.neighborhood !== r.neighborhood) {
             console.log(`🏘️ Neighborhood corrected: "${r.neighborhood}" → "${realData.neighborhood}" for ${r.name}`);
           }
-          r.neighborhood = shortenNeighborhood(realData.neighborhood);
-          // Update name to match verified neighborhood
+          const shortHood2 = shortenNeighborhood(realData.neighborhood);
+          r.neighborhood = shortHood2;
           if (r.name && r.name.includes(' — ')) {
-            r.name = r.name.split(' — ')[0] + ' — ' + realData.neighborhood;
+            r.name = r.name.split(' — ')[0] + ' — ' + shortHood2;
           }
         }
         if (realData.address) {
@@ -669,7 +669,8 @@ async function verifyNeighborhoods(results, city) {
           const oldName = r.name;
           // Replace name with real restaurant found by Google (keeps cuisine match)
           if (fallback.displayName) {
-            r.name = `${fallback.displayName}${fallback.neighborhood ? ' — ' + fallback.neighborhood : ''}`;
+            const shortHood3 = fallback.neighborhood ? shortenNeighborhood(fallback.neighborhood) : '';
+            r.name = `${fallback.displayName}${shortHood3 ? ' — ' + shortHood3 : ''}`;
           }
           if (fallback.neighborhood) {
             r.neighborhood = shortenNeighborhood(fallback.neighborhood);
