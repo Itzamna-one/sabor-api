@@ -84,7 +84,7 @@ async function getPlaceDetails(name, city, apiKey, userLat, userLng) {
       ? { latitude: userLat, longitude: userLng }
       : { latitude: getCityGeo(city).lat, longitude: getCityGeo(city).lng };
     // Tighter radius when we have user GPS (15km vs 50km)
-    const geoRadius = (userLat && userLng) ? 15000 : 50000;
+    const geoRadius = (userLat && userLng) ? 5000 : 50000; // 5km when GPS available — stay local
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
@@ -267,7 +267,7 @@ export default async function handler(req, res) {
     ? `The user enjoys ${cuisines.join(', ')} but wants to discover ALL types of food. Include at most 2 of their preferred cuisines — the rest MUST be different cuisines they haven't tried (soul food, BBQ, Chinese, Thai, Indian, Japanese, Italian, etc).`
     : '';
   const hoodContext = neighborhood
-    ? `The user is currently in ${neighborhood}. AT LEAST HALF of your picks (${Math.ceil(count/2)} of ${count}) MUST be in or within 10 minutes of ${neighborhood}. The remaining picks can be from nearby neighborhoods. Do NOT scatter results across the entire city — this user wants spots near them.`
+    ? `The user is currently in ${neighborhood}. ALL results MUST be in ${neighborhood} or directly adjacent neighborhoods (within a 10-minute drive). Do NOT include restaurants from the north side, downtown, or far neighborhoods. Think ONLY about what's near ${neighborhood}. If you don't know enough restaurants in ${neighborhood}, include spots from the closest neighboring areas (1-2 miles away).`
     : '';
 
   let restaurants;
