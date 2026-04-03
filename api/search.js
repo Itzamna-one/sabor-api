@@ -371,6 +371,10 @@ function resolveChicagoNeighborhood(address) {
   // 60619 — Chatham / Avalon Park
   if (zip === '60619') return 'Chatham';
 
+  // 60621 covers Englewood + Greater Grand Crossing edge
+  // 60637 can also bleed into Grand Crossing
+  // 60629 south end touches Chicago Lawn / West Englewood
+
   // 60620 — Auburn Gresham
   if (zip === '60620') return 'Auburn Gresham';
 
@@ -589,6 +593,26 @@ function extractCuisine(result) {
 
 // Verify all results in parallel — replace AI's guessed neighborhoods with Google's real data
 // If name lookup fails (hallucinated name), falls back to cuisine+area search
+// Shorten long Google neighborhood names that overflow UI
+function shortenNeighborhood(hood) {
+  if (!hood) return hood;
+  const shortMap = {
+    'Greater Grand Crossing': 'Grand Crossing',
+    'West Garfield Park': 'W Garfield Park',
+    'East Garfield Park': 'E Garfield Park',
+    'Ukrainian Village': 'Ukr. Village',
+    'Near West Side': 'Near West',
+    'Near North Side': 'Near North',
+    'Near South Side': 'Near South',
+    'North Center': 'North Center',
+    'Old Irving Park': 'Old Irving',
+    'Belmont Cragin': 'Belmont Cragin',
+    'Mount Greenwood': 'Mt Greenwood',
+    'Jefferson Park': 'Jefferson Pk',
+  };
+  return shortMap[hood] || hood;
+}
+
 async function verifyNeighborhoods(results, city) {
   if (!results || results.length === 0) return results;
   const apiKey = process.env.GOOGLE_PLACES_KEY;
@@ -604,7 +628,11 @@ async function verifyNeighborhoods(results, city) {
           if (resolvedHood !== r.neighborhood) {
             console.log(`🏘️ ZIP resolver corrected: "${r.neighborhood}" → "${resolvedHood}" for ${r.name} (${r.address})`);
           }
-          r.neighborhood = resolvedHood;
+          r.neighborhood = shortenNeighborhood(resolvedHood);
+          // Update the name field to match verified neighborhood
+          if (r.name && r.name.includes(' — ')) {
+            r.name = r.name.split(' — ')[0] + ' — ' + resolvedHood;
+          }
           return r; // Trust AI's address + our resolver over Google name lookup
         }
       }
@@ -616,7 +644,11 @@ async function verifyNeighborhoods(results, city) {
           if (realData.neighborhood !== r.neighborhood) {
             console.log(`🏘️ Neighborhood corrected: "${r.neighborhood}" → "${realData.neighborhood}" for ${r.name}`);
           }
-          r.neighborhood = realData.neighborhood;
+          r.neighborhood = shortenNeighborhood(realData.neighborhood);
+          // Update name to match verified neighborhood
+          if (r.name && r.name.includes(' — ')) {
+            r.name = r.name.split(' — ')[0] + ' — ' + realData.neighborhood;
+          }
         }
         if (realData.address) {
           r.address = realData.address;
@@ -640,7 +672,7 @@ async function verifyNeighborhoods(results, city) {
             r.name = `${fallback.displayName}${fallback.neighborhood ? ' — ' + fallback.neighborhood : ''}`;
           }
           if (fallback.neighborhood) {
-            r.neighborhood = fallback.neighborhood;
+            r.neighborhood = shortenNeighborhood(fallback.neighborhood);
           }
           if (fallback.address) {
             r.address = fallback.address;
