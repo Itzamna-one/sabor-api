@@ -1,6 +1,37 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { initializeApp, cert, getApps, getApp } from 'firebase-admin/app';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Lazy Firebase init
+function getDb() {
+  if (!getApps().length) {
+    const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
+    initializeApp({ credential: cert(sa) });
+  } else {
+    getApp();
+  }
+  return getFirestore();
+}
+
+// Fire-and-forget search log — never blocks the response
+function logSearch(query, city, tier, language, neighborhood) {
+  try {
+    const db = getDb();
+    const cityKey = (city || 'Chicago').split(',')[0].trim().toLowerCase();
+    db.collection('search_logs').add({
+      query: query.slice(0, 200),
+      city: cityKey,
+      tier: tier || 'free',
+      language: language || 'es',
+      neighborhood: neighborhood || null,
+      timestamp: FieldValue.serverTimestamp(),
+    }).catch(() => {}); // silently ignore write errors
+  } catch (_) {
+    // never throw — search must not fail because of logging
+  }
+}
 
 // Neighborhood intelligence — Illinois + Indiana
 const NEIGHBORHOOD_VIBES = {
@@ -1033,6 +1064,8 @@ Reglas críticas:
     }
 
     if (!skipCache) setCache(cacheKey, parsed);
+    // Log search behavior for marketing intelligence (fire-and-forget)
+    logSearch(query, city, tier, language, filterNeighborhood || currentNeighborhood);
     return res.status(200).json(parsed);
   } catch (err) {
     const errStatus = err.status || err.statusCode || null;
