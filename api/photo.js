@@ -1,6 +1,27 @@
+import { checkAppKey, checkRateLimit, getClientIp } from '../lib/sabor-security.js';
+
+// Valid Google Places photo reference: places/{placeId}/photos/{photoRef}
+const PHOTO_REF_RE = /^places\/[A-Za-z0-9_-]+\/photos\/[A-Za-z0-9_-]+$/;
+
 export default async function handler(req, res) {
+  if (!checkAppKey(req)) return res.status(401).json({ error: 'Unauthorized' });
+
   const { ref } = req.query;
   if (!ref) return res.status(400).json({ error: 'ref required' });
+
+  // Validate ref format to prevent URL injection into Google Places API path
+  if (!PHOTO_REF_RE.test(ref)) {
+    return res.status(400).json({ error: 'Invalid photo reference format' });
+  }
+
+  // Rate limit: 30 photo fetches per IP per minute
+  const clientIp = getClientIp(req);
+  const rl = checkRateLimit(clientIp, 'photo', 30, 60_000);
+  if (!rl.allowed) {
+    res.setHeader('Retry-After', String(rl.retryAfter));
+    return res.status(429).json({ error: 'Too many requests', retryAfter: rl.retryAfter });
+  }
+
   const key = process.env.GOOGLE_PLACES_KEY;
   if (!key) return res.status(500).json({ error: 'GOOGLE_PLACES_KEY not set' });
   try {

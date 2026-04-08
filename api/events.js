@@ -4,6 +4,7 @@
 
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { checkAppKey } from '../lib/sabor-security.js';
 
 // Firebase Admin
 if (!getApps().length) {
@@ -193,6 +194,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Cache-Control', 's-maxage=1800');
   if (req.method === 'OPTIONS') return res.status(200).end();
+  if (!checkAppKey(req)) return res.status(401).json({ error: 'Unauthorized' });
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const { city = 'Chicago, IL', category, budget } = req.query;

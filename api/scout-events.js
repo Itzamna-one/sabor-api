@@ -269,9 +269,9 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, API_SECRET');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const isCron = req.headers['x-vercel-cron'] === 'true';
+  const isCron = req.headers['x-vercel-cron'] === '1';
   if (!isCron) {
-    const secret = req.headers['api_secret'] || req.query?.secret;
+    const secret = req.headers['api_secret'];
     if (secret !== process.env.NOTIFY_API_SECRET) {
       return res.status(401).json({ error: 'Unauthorized' });
     }

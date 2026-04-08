@@ -1,5 +1,6 @@
 // api/home-feed.js — Home feed with caching, error handling, and fallback
 import Anthropic from '@anthropic-ai/sdk';
+import { checkAppKey, checkRateLimit, getClientIp } from '../lib/sabor-security.js';
 
 const cache = new Map();
 const CACHE_TTL = 300000; // 5 minutes
@@ -217,8 +218,21 @@ function resolveNeighborhood(address) {
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Sabor-Key');
   res.setHeader('Cache-Control', 's-maxage=300'); // CDN cache 5 min
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // ── Security gates ────────────────────────────────────────────────────────
+  if (!checkAppKey(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const clientIp = getClientIp(req);
+  const rl = checkRateLimit(clientIp, 'home-feed', 10, 60_000); // 10 req/min per IP
+  if (!rl.allowed) {
+    res.setHeader('Retry-After', String(rl.retryAfter));
+    return res.status(429).json({ error: 'Too many requests', retryAfter: rl.retryAfter });
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   // Support both GET params and POST body for personalization
   let city, section, count, diets, cuisines, neighborhood, userLat, userLng;

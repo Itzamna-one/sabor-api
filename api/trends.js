@@ -2,6 +2,7 @@
 // Uses Google Trends via unofficial RSS feed (no API key needed)
 // + curated trending data for Chicago food scene
 
+import { checkAppKey } from '../lib/sabor-security.js';
 const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args));
 
 // Curated Chicago food trends — updated manually + supplemented by Google Trends
@@ -66,6 +67,7 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 's-maxage=3600'); // Cache 1 hour
   
   if (req.method === 'OPTIONS') return res.status(200).end();
+  if (!checkAppKey(req)) return res.status(401).json({ error: 'Unauthorized' });
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const { city = 'Chicago' } = req.query;

@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { initializeApp, cert, getApps, getApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { checkAppKey, checkRateLimit, verifyTierFromRC, getClientIp } from '../lib/sabor-security.js';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -730,16 +731,30 @@ async function verifyNeighborhoods(results, city) {
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Sabor-Key");
 
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST")
     return res.status(405).json({ error: "Method not allowed" });
 
+  // ── Security gates ────────────────────────────────────────────────────────
+  if (!checkAppKey(req)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const clientIp = getClientIp(req);
+  const rl = checkRateLimit(clientIp, 'search', 20, 60_000); // 20 req/min per IP
+  if (!rl.allowed) {
+    res.setHeader('Retry-After', String(rl.retryAfter));
+    return res.status(429).json({ error: 'Too many requests', retryAfter: rl.retryAfter });
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   const {
     query,
     city = "Chicago, IL",
-    tier = "free",
+    tier: clientTier = "free",  // client-sent tier — verified server-side below
+    rcUserId = null,             // RevenueCat app user ID (= Firebase UID)
     cuisines = [],
     diets = [],
     vibes = [],
@@ -755,6 +770,13 @@ export default async function handler(req, res) {
   } = req.body;
 
   if (!query) return res.status(400).json({ error: "Query is required" });
+
+  // ── Server-side tier verification ─────────────────────────────────────────
+  // Ignores client-sent tier entirely when REVENUECAT_SECRET_KEY is set.
+  // Falls back to clientTier only during development (RC not configured yet).
+  const rcTier = await verifyTierFromRC(rcUserId);
+  const tier = rcTier !== null ? rcTier : clientTier;
+  // ─────────────────────────────────────────────────────────────────────────
 
   // Truncate user input arrays to prevent token overflow in AI prompt
   const safePreviousRestaurants = (previousRestaurants || []).slice(-8);

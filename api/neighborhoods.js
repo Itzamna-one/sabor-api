@@ -1,5 +1,6 @@
 // api/neighborhoods.js — Neighborhood data per city/metro (hardcoded for speed)
 // No AI call needed — neighborhoods don't change. Add new cities as we expand.
+import { checkAppKey } from '../lib/sabor-security.js';
 
 const CITY_NEIGHBORHOODS = {
   // ═══════════════════════════════════════
@@ -254,6 +255,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
+  if (!checkAppKey(req)) return res.status(401).json({ error: 'Unauthorized' });
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const city = (req.query.city || 'Chicago, IL').trim();
