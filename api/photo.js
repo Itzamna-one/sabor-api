@@ -1,11 +1,9 @@
-import { checkAppKey, checkRateLimit, getClientIp } from '../lib/sabor-security.js';
+import { checkRateLimit, getClientIp } from '../lib/sabor-security.js';
 
 // Valid Google Places photo reference: places/{placeId}/photos/{photoRef}
 const PHOTO_REF_RE = /^places\/[A-Za-z0-9_-]+\/photos\/[A-Za-z0-9_-]+$/;
 
 export default async function handler(req, res) {
-  if (!checkAppKey(req)) return res.status(401).json({ error: 'Unauthorized' });
-
   const { ref } = req.query;
   if (!ref) return res.status(400).json({ error: 'ref required' });
 
