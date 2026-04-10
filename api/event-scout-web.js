@@ -287,7 +287,7 @@ async function storeEvents(events) {
       image: null,
       premiumOnly: false,
       earlyAccess: false,
-      tags: [...(event.tags || []), 'food', 'sabor'].filter((v, i, a) => a.indexOf(v) === i),
+      tags: [...(event.tags || []), 'food'].filter((v, i, a) => a.indexOf(v) === i),
       source: 'SABOR',
       url: event.url || null,
       recurring: false,
