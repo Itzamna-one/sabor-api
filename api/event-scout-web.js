@@ -17,23 +17,109 @@ if (!getApps().length) {
 const db = getFirestore();
 const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// ── Search queries — covers Latin, food, cultural festivals in Chicago + suburbs ──
-const SEARCH_QUERIES = [
+// ── Base search queries — covers Latin, food, cultural, farm events ──
+const BASE_QUERIES = [
+  // Latin/Mexican core
   'Latin food festival Chicago 2026',
   'Hispanic festival Chicago 2026',
   'Mexican food festival Chicago Illinois 2026',
-  'Spanish festival Elgin Illinois 2026',
-  'Chicago food festival summer 2026',
-  'Latino festival Chicago suburbs 2026',
-  'Caribbean festival Chicago 2026',
-  'taco festival Chicago 2026',
   'fiesta Chicago Illinois 2026',
+  'taco festival Chicago 2026',
   'Puerto Rican festival Chicago 2026',
   'Colombian festival Chicago 2026',
+  'Caribbean festival Chicago 2026',
+  // Suburbs — Latin
+  'Spanish festival Elgin Illinois 2026',
+  'jaripeo Elgin Illinois 2026',
+  'jaripeo Chicago suburbs 2026',
+  'charreada Illinois 2026',
+  'Mexican rodeo Aurora Waukegan Joliet 2026',
+  'Latino festival Aurora Joliet Waukegan 2026',
+  // Farm / agritourism / morning drinking
+  'farm brunch Illinois 2026',
+  'winery brunch Chicago suburbs 2026',
+  'agritourism event Illinois 2026',
+  'vineyard festival Illinois 2026',
+  'farm to table brunch Illinois 2026',
+  'orchard festival drinking Illinois 2026',
+  // Food fests general
+  'Chicago food festival summer 2026',
   'food truck festival Chicago 2026',
   'cultural food festival Chicago Illinois 2026',
-  'Aurora Joliet Waukegan Latin festival 2026',
+  'Latino festival Chicago suburbs 2026',
 ];
+
+// ── Load learned queries from Firestore (added by AI after each run) ──
+async function loadLearnedQueries() {
+  try {
+    const snap = await db.collection('scout_learned_queries')
+      .where('active', '==', true)
+      .orderBy('createdAt', 'desc')
+      .limit(20)
+      .get();
+    return snap.docs.map(d => d.data().query).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+// ── After each run, ask Claude to suggest new search queries based on what was found ──
+async function generateLearnedQueries(foundEvents) {
+  if (!foundEvents.length) return;
+  try {
+    const sample = foundEvents.slice(0, 15).map(e =>
+      `- ${e.title} (${e.neighborhood || e.city}, ${e.date})`
+    ).join('\n');
+
+    const msg = await claude.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 400,
+      messages: [{
+        role: 'user',
+        content: `You are helping SABOR, a Chicago-area food & Latin culture discovery app, find more events.
+
+Based on these events found this week:
+${sample}
+
+Generate 5 NEW web search queries to find MORE events like these — especially:
+- Jaripeos, charreadas, Mexican rodeos in Illinois suburbs
+- Farm brunches, winery mornings, agritourism with food/drinks
+- Niche Latin/cultural food events in Chicago suburbs (Elgin, Aurora, Waukegan, Joliet, Cicero, Berwyn)
+- Events we likely missed
+
+Rules:
+- Each query must include a year (2026) and location (city or Illinois/Chicago)
+- No duplicates of common queries already being searched
+- Focus on underserved niches
+
+Respond ONLY with a JSON array of 5 query strings:
+["query 1", "query 2", "query 3", "query 4", "query 5"]`
+      }],
+    });
+
+    let raw = msg.content[0]?.text?.trim() || '[]';
+    if (raw.startsWith('```')) raw = raw.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
+    const queries = JSON.parse(raw);
+    if (!Array.isArray(queries)) return;
+
+    const batch = db.batch();
+    const col = db.collection('scout_learned_queries');
+    for (const query of queries) {
+      if (typeof query !== 'string' || query.length < 10) continue;
+      const id = query.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 60);
+      batch.set(col.doc(id), {
+        query,
+        active: true,
+        createdAt: new Date().toISOString(),
+        source: 'auto-learned',
+      }, { merge: true });
+    }
+    await batch.commit();
+    console.log(`🧠 Learned ${queries.length} new search queries for next run`);
+  } catch (err) {
+    console.error('Learning loop failed:', err.message);
+  }
+}
 
 // ── Brave Search ──
 async function braveSearch(query) {
@@ -241,14 +327,19 @@ export default async function handler(req, res) {
 
   console.log('🔍 Web event scout starting...');
 
+  // Combine base queries with AI-learned queries from previous runs
+  const learnedQueries = await loadLearnedQueries();
+  const SEARCH_QUERIES = [...new Set([...BASE_QUERIES, ...learnedQueries])];
+  console.log(`📋 Running ${SEARCH_QUERIES.length} queries (${BASE_QUERIES.length} base + ${learnedQueries.length} learned)`);
+
   const allEvents = [];
   const errors = [];
 
   // Run searches in batches of 3 to avoid rate limits
   for (let i = 0; i < SEARCH_QUERIES.length; i += 3) {
-    const batch = SEARCH_QUERIES.slice(i, i + 3);
+    const batchQueries = SEARCH_QUERIES.slice(i, i + 3);
     const results = await Promise.all(
-      batch.map(async (query) => {
+      batchQueries.map(async (query) => {
         const searchResults = await braveSearch(query);
         const events = await extractEvents(searchResults, query);
         console.log(`  "${query}" → ${events.length} events found`);
@@ -256,7 +347,6 @@ export default async function handler(req, res) {
       })
     );
     allEvents.push(...results.flat());
-    // Small delay between batches
     if (i + 3 < SEARCH_QUERIES.length) await new Promise(r => setTimeout(r, 500));
   }
 
@@ -271,11 +361,16 @@ export default async function handler(req, res) {
 
   const stored = await storeEvents(unique);
 
+  // Learning loop — generate new queries for next week based on what we found
+  await generateLearnedQueries(unique);
+
   console.log(`✅ Web scout done: ${unique.length} unique events found, ${stored} new stored`);
 
   return res.status(200).json({
     success: true,
     searched: SEARCH_QUERIES.length,
+    base: BASE_QUERIES.length,
+    learned: learnedQueries.length,
     found: allEvents.length,
     unique: unique.length,
     stored,
