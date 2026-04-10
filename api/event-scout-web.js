@@ -208,8 +208,8 @@ Respond ONLY with valid JSON array (empty array [] if nothing qualifies):
   "time": "start time or empty string",
   "price": "price string or Free",
   "priceNum": 0,
-  "category": "festival|tasting|brunch|happy_hour|pop_up|market|special",
-  "vibe": "Festival|Tasting|Brunch|Happy Hour|Pop-Up|Market|Food Event",
+  "category": "festival|music_fest|tasting|brunch|happy_hour|pop_up|market|special",
+  "vibe": "Festival|Music Festival|Tasting|Brunch|Happy Hour|Pop-Up|Market|Food Event",
   "url": "event URL",
   "tags": ["food", "sabor", "relevant", "tags"],
   "confidence": "high|medium"
