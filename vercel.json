@@ -4,6 +4,10 @@
     {
       "path": "/api/scout-events?city=Chicago,%20IL",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/event-scout-web",
+      "schedule": "0 15 * * 0"
     }
   ],
   "functions": {
@@ -30,6 +34,9 @@
     },
     "api/submit-event.js": {
       "maxDuration": 15
+    },
+    "api/event-scout-web.js": {
+      "maxDuration": 60
     }
   },
   "headers": [
