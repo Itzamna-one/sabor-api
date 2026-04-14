@@ -16,6 +16,53 @@ function getDb() {
   return getFirestore();
 }
 
+// Owner tier cache — refreshed every 10 minutes to avoid per-search Firestore reads
+let _ownerTierCache = null;
+let _ownerTierCacheAt = 0;
+const OWNER_TIER_TTL = 10 * 60 * 1000; // 10 minutes
+
+async function getOwnerTierMap() {
+  const now = Date.now();
+  if (_ownerTierCache && now - _ownerTierCacheAt < OWNER_TIER_TTL) return _ownerTierCache;
+  try {
+    const db = getDb();
+    const snap = await db.collection('owner_accounts')
+      .where('active', '==', true)
+      .get();
+    const map = {};
+    snap.forEach(doc => {
+      const d = doc.data();
+      if (!d.restaurantName) return;
+      // badgeType takes precedence over tier for display
+      const displayTier = d.badgeType || d.tier || null;
+      if (!displayTier || displayTier === 'free') return;
+      const key = d.restaurantName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      map[key] = displayTier; // 'pick' | 'pro' | 'elite'
+    });
+    _ownerTierCache = map;
+    _ownerTierCacheAt = now;
+    return map;
+  } catch (e) {
+    console.error('Owner tier cache load failed:', e.message);
+    return _ownerTierCache || {};
+  }
+}
+
+async function injectOwnerTiers(results) {
+  if (!results || results.length === 0) return results;
+  try {
+    const tierMap = await getOwnerTierMap();
+    if (Object.keys(tierMap).length === 0) return results;
+    return results.map(r => {
+      const cleanName = (r.name || '').split(' — ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+      const tier = tierMap[cleanName];
+      return tier ? { ...r, ownerTier: tier } : r;
+    });
+  } catch (_) {
+    return results; // never fail a search because of badge lookup
+  }
+}
+
 // Fire-and-forget search log — never blocks the response
 function logSearch(query, city, tier, language, neighborhood) {
   try {
@@ -1083,6 +1130,9 @@ Reglas críticas:
         console.error('Neighborhood verification failed (returning unverified):', verifyErr.message);
         // Return results without verification rather than 500
       }
+      try {
+        parsed.results = await injectOwnerTiers(parsed.results);
+      } catch (_) {} // never fail a search because of badge lookup
     }
 
     if (!skipCache) setCache(cacheKey, parsed);
