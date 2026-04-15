@@ -8,7 +8,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { checkRateLimit, getClientIp } from '../lib/sabor-security.js';
+import { checkRateLimit, getClientIp, checkAppKey } from '../lib/sabor-security.js';
 
 if (!getApps().length) {
   const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
