@@ -35,7 +35,8 @@ export default async function handler(req, res) {
 
   // Auth check — must include secret header
   const secret = req.headers['x-api-secret'];
-  if (secret !== process.env.NOTIFY_API_SECRET) {
+  const expected = process.env.NOTIFY_API_SECRET;
+  if (!expected || secret !== expected) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
