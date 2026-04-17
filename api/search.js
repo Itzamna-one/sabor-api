@@ -103,7 +103,7 @@ const NEIGHBORHOOD_VIBES = {
   "Devon Ave":        "Indian, Pakistani, Bangladeshi, South Asian street food, biryani",
   "Albany Park":      "Korean BBQ, Middle Eastern, Guatemalan, one of Chicago's most diverse food scenes",
   "Rogers Park":      "Jamaican, Mexican, Ethiopian, diverse student-area eats",
-  "Hyde Park":        "soul food, Japanese, campus eats, Harold's Chicken, diverse cafes",
+  "Hyde Park":        "soul food, Japanese, campus eats, independent diners, diverse cafes",
   "West Loop":        "Randolph Row, steakhouses, Greek Town, fine dining, chef-driven spots",
   "Lakeview":         "Thai, ramen, sports bars, diverse casual dining, brunch",
   "East Garfield Park":"emerging eats, soul food, community spots, Madison Street corridor",
@@ -1007,6 +1007,7 @@ Critical rules:
 - ${rotationNote || "Vary the restaurants"}
 - Respect radius ${tierConfig.radius}
 - ${isPremium ? "Can recommend from any neighborhood in Chicago" : `Stay within ${tierConfig.radius} of the user`}
+- INDEPENDENT SPOTS ONLY: NEVER recommend chain restaurants or fast food brands — this includes local chains with multiple locations. Banned: Harold's Chicken, Sharks Fish & Chicken, Portillo's, McDonald's, Burger King, Subway, Wendy's, Popeyes, Chick-fil-A, Chipotle, Panda Express, Olive Garden, Applebee's, or any brand with more than 3 metro-area locations. SABOR is for independent, family-owned spots only.
 - REAL RESTAURANTS ONLY: Every restaurant you name MUST be a real, established business that exists on Google Maps RIGHT NOW. Do NOT invent creative names like "Elote Cart on Cermak" or "Night Taco Truck on Archer" — these are made up. Use the restaurant's ACTUAL business name as it appears on Google Maps or Yelp (e.g. "Taquería Los Comales", "Joy Yee's Noodles", "Avec"). If you are not 95% certain a restaurant exists with that exact name, pick a well-known restaurant you ARE certain about instead.
 - NEIGHBORHOOD ACCURACY: The "neighborhood" field MUST match the restaurant's REAL physical location. Chicago neighborhood boundaries:
   • Chinatown = Wentworth Ave corridor, roughly Cermak (22nd) to 26th St. ONLY restaurants ON or NEAR Wentworth/Archer between 22nd-26th are Chinatown.
