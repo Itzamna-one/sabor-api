@@ -49,7 +49,7 @@ async function collectEvents(city) {
   const foodKeywords = [
     'food festival', 'food truck', 'wine tasting', 'beer festival',
     'brunch', 'cooking class', 'taco', 'bbq barbecue',
-    'cocktail', 'happy hour', 'chef dinner', 'latin food mexican',
+    'cocktail', 'happy hour food', 'chef dinner', 'latin food mexican',
     'prix fixe', 'supper club', 'distillery tasting', 'night market',
     'seafood', 'pizza fest', 'whiskey tasting', 'rooftop dining',
   ];
@@ -159,7 +159,8 @@ async function enrichEvents(formatted, city) {
 
 From these ${chunk.length} Ticketmaster events, select ONLY genuinely food or drink related ones.
 
-INCLUDE: Food festivals, tastings, wine/beer/cocktail events, brunch events, dinner shows, chef events, cooking classes, events at restaurants/breweries/wineries, cultural food festivals, BBQ, night markets, pop-ups, happy hours, prix fixe dinners.
+INCLUDE: Food festivals, tastings, wine/beer/cocktail events, brunch events, dinner shows, chef events, cooking classes, events at restaurants/breweries/wineries, cultural food festivals, BBQ, night markets, pop-ups, happy hours WITH notable food (apps, bites, specials — not just drinks), prix fixe dinners.
+EXCLUDE happy hours that are drinks-only with no food component.
 
 EXCLUDE: Pure concerts/sports with no food angle, conferences, events before ${today}.
 NO DUPLICATES: Same event at different dates → list ONCE with earliest date.
