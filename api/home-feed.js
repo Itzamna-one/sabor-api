@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { checkAppKey, checkRateLimit, getClientIp } from '../lib/sabor-security.js';
 
 const cache = new Map();
-const CACHE_TTL = 300000; // 5 minutes
+const CACHE_TTL = 600000; // 10 minutes
 
 const SECTION_PROMPTS = {
   en_fuego:        'the most buzzing, talked-about restaurants in local neighborhoods right now — places people are discovering on social media and word of mouth. NOT Michelin-starred or nationally famous fine dining',
@@ -219,7 +219,7 @@ function resolveNeighborhood(address) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Sabor-Key');
-  res.setHeader('Cache-Control', 's-maxage=300'); // CDN cache 5 min
+  res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=300'); // CDN cache 10 min, serve stale 5 min while revalidating
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   // ── Security gates ────────────────────────────────────────────────────────

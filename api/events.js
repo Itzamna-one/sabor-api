@@ -177,7 +177,7 @@ async function fetchScoutedEvents(city) {
         image: d.image || null,
         premiumOnly: false,
         earlyAccess: false,
-        tags: d.tags || ['food', 'sabor'],
+        tags: d.tags || ['food'],
         source: d.source || 'SABOR',
         url: d.url || null,
         recurring: d.recurring || false,
