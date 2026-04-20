@@ -21,6 +21,7 @@ const CITY_NEIGHBORHOODS = {
     { name: 'Chicago Lawn',      emoji: '🌮', vibe: 'Mexican · Middle Eastern' },
     // ── North / Northwest ──
     { name: 'Logan Square',      emoji: '🍜', vibe: 'Trendy · Fusion' },
+    { name: 'Avondale',          emoji: '💎', vibe: 'Polish-Mexican · Hidden' },
     { name: 'Wicker Park',       emoji: '📸', vibe: 'Brunch · Eclectic' },
     { name: 'Albany Park',       emoji: '🌍', vibe: 'Most Diverse · Global' },
     { name: 'Devon Ave',         emoji: '🍛', vibe: 'South Asian · Biryani' },
