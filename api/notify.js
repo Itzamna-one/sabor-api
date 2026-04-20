@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { type, title, body, data = {}, topic } = req.body;
+  const { type, title, body, data = {}, topic, city } = req.body;
   if (!title || !body) {
     return res.status(400).json({ error: 'title and body are required' });
   }
@@ -66,8 +66,10 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, method: 'topic', topic, messageId: result });
     }
 
-    // Fallback: send to all stored FCM tokens
-    const snapshot = await db.collection('fcm_tokens').get();
+    // Send to all tokens, optionally filtered by city
+    let query = db.collection('fcm_tokens');
+    if (city) query = query.where('city', '==', city.toLowerCase());
+    const snapshot = await query.get();
     if (snapshot.empty) {
       return res.status(200).json({ success: true, sent: 0, message: 'No tokens registered' });
     }
