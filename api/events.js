@@ -91,9 +91,9 @@ async function fetchTicketmasterEvents(city) {
       const priceStr = priceMin ? (priceMax && priceMax !== priceMin ? `$${priceMin} - $${priceMax}` : `$${priceMin}`) : 'See event';
       const img = e.images?.find(img => img.width >= 300)?.url || null;
 
-      // Format date — always "DayName, Month Date" (client adds "Today" label locally)
-      const eventDate = new Date(startLocal + 'T' + (startTime || '00:00:00'));
-      const dateStr = `${days[eventDate.getDay()]}, ${months[eventDate.getMonth()]} ${eventDate.getDate()}`;
+      // Format date — parse localDate parts directly to avoid UTC offset shifting the day
+      const [yyyy, mm, dd] = startLocal.split('-').map(Number);
+      const dateStr = `${days[new Date(yyyy, mm - 1, dd).getDay()]}, ${months[mm - 1]} ${dd}`;
 
       // Format time
       let timeStr = '';
