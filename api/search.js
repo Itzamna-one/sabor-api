@@ -21,6 +21,49 @@ let _ownerTierCache = null;
 let _ownerTierCacheAt = 0;
 const OWNER_TIER_TTL = 10 * 60 * 1000; // 10 minutes
 
+// Home vendor cache — approved home kitchens from vendor_submissions
+let _homeVendorCache = null;
+let _homeVendorCacheAt = 0;
+const HOME_VENDOR_TTL = 10 * 60 * 1000; // 10 minutes
+
+async function getHomeVendors() {
+  const now = Date.now();
+  if (_homeVendorCache && now - _homeVendorCacheAt < HOME_VENDOR_TTL) return _homeVendorCache;
+  try {
+    const db = getDb();
+    const snap = await db.collection('vendor_submissions')
+      .where('vendorType', '==', 'home')
+      .where('status', '==', 'approved')
+      .get();
+    const vendors = [];
+    snap.forEach(doc => {
+      const d = doc.data();
+      if (!d.restaurantName) return;
+      vendors.push({
+        name: d.restaurantName,
+        neighborhood: d.neighborhood || '',
+        city: d.city || '',
+        cuisineType: d.cuisineType || '',
+        description: d.description || '',
+        availability: d.availability || '',
+        orderCutoff: d.orderCutoff || '',
+        contactUrl: d.contactUrl || '',
+        contactType: d.contactType || 'whatsapp',
+        contactHandle: d.contactHandle || '',
+      });
+    });
+    _homeVendorCache = vendors;
+    _homeVendorCacheAt = now;
+    return vendors;
+  } catch (e) {
+    console.error('Home vendor cache load failed:', e.message);
+    return _homeVendorCache || [];
+  }
+}
+
+// Keywords that indicate the user is looking for home cooks / cottage food vendors
+const HOME_VENDOR_KEYWORDS = /\b(tamale|tamales|tamalera|tamale lady|home cook|home kitchen|home made|homemade|cottage food|home vendor|casero|casera|hecho en casa|antojitos caseros|home chef|elotero|paletero|pop.?up)\b/i;
+
 async function getOwnerTierMap() {
   const now = Date.now();
   if (_ownerTierCache && now - _ownerTierCacheAt < OWNER_TIER_TTL) return _ownerTierCache;
@@ -963,6 +1006,54 @@ export default async function handler(req, res) {
     }
   }
 
+  // Home vendor injection — approved home kitchens from vendor_submissions
+  const isHomeVendorQuery = HOME_VENDOR_KEYWORDS.test(query);
+  let homeVendorContext = '';
+  let homeVendorResults = []; // prepended for home vendor queries
+  try {
+    const allVendors = await getHomeVendors();
+    const cityBase = city.split(',')[0].trim().toLowerCase();
+    const cityVendors = allVendors.filter(v => v.city.toLowerCase().startsWith(cityBase));
+    if (cityVendors.length > 0) {
+      if (isHomeVendorQuery) {
+        // Return matching vendors directly as results (no Claude needed for these)
+        homeVendorResults = cityVendors.map(v => ({
+          name: `${v.name} — ${v.neighborhood}`,
+          emoji: '🏠',
+          description: `${v.description || v.cuisineType}${v.orderCutoff ? ` · ${v.orderCutoff}` : ''}`,
+          tag: '🏠 Home Kitchen',
+          distance: '~',
+          address: null,
+          neighborhood: v.neighborhood,
+          vendorType: 'home',
+          availability: v.availability,
+          orderCutoff: v.orderCutoff,
+          contactUrl: v.contactUrl,
+          contactType: v.contactType,
+          contactHandle: v.contactHandle,
+        }));
+      } else {
+        // Inject as context so Claude knows about them and can reference them
+        const vendorList = cityVendors.map(v =>
+          `- ${v.name} (${v.neighborhood}): ${v.cuisineType}${v.availability ? `, available ${v.availability}` : ''}${v.orderCutoff ? `, ${v.orderCutoff}` : ''}`
+        ).join('\n');
+        homeVendorContext = language === 'en'
+          ? `\n\nCOMMUNITY HOME KITCHENS (approved home cooks in this area — mention them if relevant):\n${vendorList}`
+          : `\n\nCOCINAS CASERAS COMUNITARIAS (cocineros aprobados en esta área — menciónalos si es relevante):\n${vendorList}`;
+      }
+    }
+  } catch (_) {
+    // never block a search due to home vendor lookup
+  }
+
+  // If it's a pure home vendor query and we have results, return them directly
+  if (isHomeVendorQuery && homeVendorResults.length > 0) {
+    const summary = language === 'en'
+      ? `Found ${homeVendorResults.length} home kitchen${homeVendorResults.length > 1 ? 's' : ''} near you. These are community cooks — order ahead!`
+      : `Encontré ${homeVendorResults.length} cocina${homeVendorResults.length > 1 ? 's' : ''} casera${homeVendorResults.length > 1 ? 's' : ''} cerca de ti. Son cocineras comunitarias — ¡ordena con anticipación!`;
+    return res.status(200).json({ summary, results: homeVendorResults, homeVendors: true });
+  }
+
   try {
     // 55s timeout to stay under Vercel's 60s limit
     const aiTimeout = new Promise((_, reject) =>
@@ -981,7 +1072,7 @@ ${isPlanQuery ? `TIME AWARENESS: ${timeContext}\n\nCreate a food itinerary start
 
 ${neighborhoodContext}
 ${personalization}${tasteContext}
-${rotationNote}
+${rotationNote}${homeVendorContext}
 
 Search: "${query}"
 
@@ -1033,7 +1124,7 @@ ${isPlanQuery ? `HORA ACTUAL: ${timeContext}\n\nCrea un itinerario de comida emp
 
 ${neighborhoodContext}
 ${personalization}${tasteContext}
-${rotationNote}
+${rotationNote}${homeVendorContext}
 
 Búsqueda: "${query}"
 
