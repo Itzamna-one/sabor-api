@@ -14,7 +14,7 @@ export default async function handler(req, res) {
 
   // Rate limit: 30 photo fetches per IP per minute
   const clientIp = getClientIp(req);
-  const rl = checkRateLimit(clientIp, 'photo', 30, 60_000);
+  const rl = await checkRateLimit(clientIp, 'photo', 30, 60_000);
   if (!rl.allowed) {
     res.setHeader('Retry-After', String(rl.retryAfter));
     return res.status(429).json({ error: 'Too many requests', retryAfter: rl.retryAfter });

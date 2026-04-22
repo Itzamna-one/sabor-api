@@ -128,7 +128,7 @@ export default async function handler(req, res) {
 
   // ── Rate limit: 5 submissions per IP per hour ─────────────────────────────
   const clientIp = getClientIp(req);
-  const rl = checkRateLimit(clientIp, 'submit-event', 5, 60 * 60_000);
+  const rl = await checkRateLimit(clientIp, 'submit-event', 5, 60 * 60_000);
   if (!rl.allowed) {
     res.setHeader('Retry-After', String(rl.retryAfter));
     return res.status(429).json({ error: 'Too many submissions. Please wait before submitting again.', retryAfter: rl.retryAfter });

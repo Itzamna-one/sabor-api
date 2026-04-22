@@ -837,7 +837,7 @@ export default async function handler(req, res) {
   }
 
   const clientIp = getClientIp(req);
-  const rl = checkRateLimit(clientIp, 'search', 20, 60_000); // 20 req/min per IP
+  const rl = await checkRateLimit(clientIp, 'search', 20, 60_000); // 20 req/min per IP
   if (!rl.allowed) {
     res.setHeader('Retry-After', String(rl.retryAfter));
     return res.status(429).json({ error: 'Too many requests', retryAfter: rl.retryAfter });

@@ -227,7 +227,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   const clientIp = getClientIp(req);
-  const rl = checkRateLimit(clientIp, 'home-feed', 10, 60_000); // 10 req/min per IP
+  const rl = await checkRateLimit(clientIp, 'home-feed', 10, 60_000); // 10 req/min per IP
   if (!rl.allowed) {
     res.setHeader('Retry-After', String(rl.retryAfter));
     return res.status(429).json({ error: 'Too many requests', retryAfter: rl.retryAfter });
