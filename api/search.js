@@ -195,7 +195,7 @@ const NEIGHBORHOOD_VIBES = {
 // Tier radius config
 const TIER_CONFIG = {
   free:    { radius: "1mi",     label: 'cerca de ti' },
-  credits: { radius: "3mi",     label: "tu zona" },
+  credits: { radius: "citywide", label: "toda la ciudad" },
   premium: { radius: "citywide",label: "toda la ciudad" },
 };
 
@@ -1060,8 +1060,8 @@ export default async function handler(req, res) {
       setTimeout(() => reject(new Error('Claude API timeout after 55s')), 55000)
     );
     const message = await Promise.race([aiTimeout, client.messages.create({
-      model: tier === "premium" ? "claude-sonnet-4-20250514" : "claude-haiku-4-5-20251001",
-      max_tokens: isPlanQuery ? 1800 : (tier === 'premium' ? 1400 : 700),
+      model: (tier === "premium" || tier === "credits") ? "claude-sonnet-4-20250514" : "claude-haiku-4-5-20251001",
+      max_tokens: isPlanQuery ? 1800 : (tier === 'free' ? 700 : 1400),
       messages: [
         {
           role: "user",
@@ -1098,10 +1098,10 @@ Respond ONLY with valid JSON — no markdown, no backticks:
 }
 
 Critical rules:
-- Exactly ${isPlanQuery ? String(planStops) : (tier === 'premium' ? '6' : '3')} unique results${isPlanQuery ? `\n- TIME IS ${currentHour}:00 — ONLY use meal labels appropriate for this hour. After 5pm: "Dinner", "Late Night", "Dessert", "Drinks". NEVER use "Morning", "Breakfast", "Brunch", or "Lunch" after 5pm. NEVER use "Dinner" or "Late Night" before noon.` : ''}
+- Exactly ${isPlanQuery ? String(planStops) : (tier === 'free' ? '3' : '6')} unique results${isPlanQuery ? `\n- TIME IS ${currentHour}:00 — ONLY use meal labels appropriate for this hour. After 5pm: "Dinner", "Late Night", "Dessert", "Drinks". NEVER use "Morning", "Breakfast", "Brunch", or "Lunch" after 5pm. NEVER use "Dinner" or "Late Night" before noon.` : ''}
 - ${rotationNote || "Vary the restaurants"}
 - Respect radius ${tierConfig.radius}
-- ${isPremium ? "Can recommend from any neighborhood in Chicago" : `Stay within ${tierConfig.radius} of the user`}
+- ${(isPremium || hasCredits) ? "Can recommend from any neighborhood in Chicago" : `Stay within ${tierConfig.radius} of the user`}
 - INDEPENDENT SPOTS ONLY: NEVER recommend chain restaurants or fast food brands — this includes local chains with multiple locations. Banned: Harold's Chicken, Sharks Fish & Chicken, Portillo's, McDonald's, Burger King, Subway, Wendy's, Popeyes, Chick-fil-A, Chipotle, Panda Express, Olive Garden, Applebee's, or any brand with more than 3 metro-area locations. SABOR is for independent, family-owned spots only.
 - REAL RESTAURANTS ONLY: Every restaurant you name MUST be a real, established business that exists on Google Maps RIGHT NOW. Do NOT invent creative names like "Elote Cart on Cermak" or "Night Taco Truck on Archer" — these are made up. Use the restaurant's ACTUAL business name as it appears on Google Maps or Yelp (e.g. "Taquería Los Comales", "Joy Yee's Noodles", "Avec"). If you are not 95% certain a restaurant exists with that exact name, pick a well-known restaurant you ARE certain about instead.
 - NEIGHBORHOOD ACCURACY: The "neighborhood" field MUST match the restaurant's REAL physical location. Chicago neighborhood boundaries:
@@ -1148,10 +1148,10 @@ Responde SOLO con JSON válido — sin markdown, sin backticks:
 }
 
 Reglas críticas:
-- Exactamente ${isPlanQuery ? String(planStops) : (tier === 'premium' ? '6' : '3')} resultados únicos${isPlanQuery ? `\n- SON LAS ${currentHour}:00 — SOLO usa etiquetas de comida apropiadas para esta hora. Después de las 5pm: "Cena", "Late Night", "Postre", "Drinks". NUNCA uses "Mañana", "Desayuno", "Brunch", o "Almuerzo" después de las 5pm. NUNCA uses "Cena" o "Late Night" antes del mediodía.` : ''}
+- Exactamente ${isPlanQuery ? String(planStops) : (tier === 'free' ? '3' : '6')} resultados únicos${isPlanQuery ? `\n- SON LAS ${currentHour}:00 — SOLO usa etiquetas de comida apropiadas para esta hora. Después de las 5pm: "Cena", "Late Night", "Postre", "Drinks". NUNCA uses "Mañana", "Desayuno", "Brunch", o "Almuerzo" después de las 5pm. NUNCA uses "Cena" o "Late Night" antes del mediodía.` : ''}
 - ${rotationNote || "Varía los restaurantes"}
 - Respeta radio ${tierConfig.radius}
-- ${isPremium ? "Puedes recomendar de cualquier barrio de " + city : `Mantente dentro de ${tierConfig.radius} del usuario`}
+- ${(isPremium || hasCredits) ? "Puedes recomendar de cualquier barrio de " + city : `Mantente dentro de ${tierConfig.radius} del usuario`}
 - SOLO RESTAURANTES REALES: Cada restaurante DEBE ser un negocio real que existe en Google Maps AHORA MISMO. NO inventes nombres creativos como "Carrito de Elote en Cermak" o "Taco Truck Nocturno en Archer" — esos no existen. Usa el NOMBRE REAL del negocio como aparece en Google Maps o Yelp (ej: "Taquería Los Comales", "Joy Yee's Noodles", "Avec"). Si no estás 95% seguro de que el restaurante existe con ese nombre exacto, elige uno conocido del que SÍ estés seguro.
 - PRECISIÓN DE BARRIO: El campo "neighborhood" DEBE coincidir con la ubicación REAL del restaurante. Límites de barrios en Chicago:
   • Chinatown = corredor Wentworth Ave, aprox. Cermak (22nd) a 26th St. SOLO restaurantes EN o CERCA de Wentworth/Archer entre 22nd-26th son Chinatown.
