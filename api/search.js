@@ -2,6 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { initializeApp, cert, getApps, getApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { checkAppKey, checkRateLimit, verifyTierFromRC, getClientIp } from '../lib/sabor-security.js';
+import { initSentry, captureException } from '../lib/sentry.js';
+initSentry();
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -1238,7 +1240,7 @@ Reglas críticas:
   } catch (err) {
     const errStatus = err.status || err.statusCode || null;
     const errType = err.error?.error?.type || err.type || null;
-    console.error(`SABOR API error [${errStatus}] [${errType}]:`, err.message, JSON.stringify(err.error || {}).substring(0, 500));
+    captureException(err, { query, city, tier, errStatus, errType });
 
     // Return a user-friendly error with a retry hint instead of raw 500
     const statusCode = errStatus === 529 ? 503 : 500;
