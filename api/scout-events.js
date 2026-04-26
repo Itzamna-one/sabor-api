@@ -284,14 +284,14 @@ export default async function handler(req, res) {
     const { events: raw, errors } = await collectEvents(city);
 
     if (raw.length === 0) {
-      const cleaned = await cleanupExpired();
+      const cleaned = city.startsWith('Chicago') ? await cleanupExpired() : 0;
       return res.status(200).json({ success: true, city, collected: 0, enriched: 0, stored: 0, cleaned, events: [], errors });
     }
 
     const formatted = formatForClaude(raw, city);
     const enriched = await enrichEvents(formatted, city);
     const stored = await storeEvents(enriched, city);
-    const cleaned = await cleanupExpired();
+    const cleaned = city.startsWith('Chicago') ? await cleanupExpired() : 0;
 
     return res.status(200).json({
       success: true, city,
