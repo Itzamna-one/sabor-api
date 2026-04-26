@@ -1,18 +1,16 @@
 {
   "version": 2,
   "crons": [
-    {
-      "path": "/api/scout-events?city=Chicago,%20IL",
-      "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/event-scout-web",
-      "schedule": "0 15 * * 0"
-    },
-    {
-      "path": "/api/weekly-digest",
-      "schedule": "0 14 * * 1"
-    }
+    { "path": "/api/scout-events?city=Chicago,%20IL",       "schedule": "0 12 * * *"  },
+    { "path": "/api/scout-events?city=Indianapolis,%20IN",  "schedule": "5 12 * * *"  },
+    { "path": "/api/scout-events?city=Aurora,%20IL",        "schedule": "10 12 * * *" },
+    { "path": "/api/scout-events?city=Waukegan,%20IL",      "schedule": "15 12 * * *" },
+    { "path": "/api/scout-events?city=Elgin,%20IL",         "schedule": "20 12 * * *" },
+    { "path": "/api/scout-events?city=Cicero,%20IL",        "schedule": "25 12 * * *" },
+    { "path": "/api/scout-events?city=Joliet,%20IL",        "schedule": "30 12 * * *" },
+    { "path": "/api/scout-events?city=Berwyn,%20IL",        "schedule": "35 12 * * *" },
+    { "path": "/api/event-scout-web",                       "schedule": "0 15 * * 0"  },
+    { "path": "/api/weekly-digest",                         "schedule": "0 14 * * 1"  }
   ],
   "functions": {
     "api/search.js": {
