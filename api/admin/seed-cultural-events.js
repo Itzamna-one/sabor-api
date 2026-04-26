@@ -362,16 +362,19 @@ export default async function handler(req, res) {
   const now = new Date().toISOString();
   const CULTURAL_EVENTS = getCulturalEvents(year);
 
+  const force = req.query?.force === 'true';
   const collection = db.collection('sabor_events');
   const batch = db.batch();
   let seeded = 0;
   let skipped = 0;
 
   for (const event of CULTURAL_EVENTS) {
-    const existing = await collection.doc(event.id).get();
-    if (existing.exists) {
-      skipped++;
-      continue;
+    if (!force) {
+      const existing = await collection.doc(event.id).get();
+      if (existing.exists) {
+        skipped++;
+        continue;
+      }
     }
     batch.set(collection.doc(event.id), {
       ...event,
