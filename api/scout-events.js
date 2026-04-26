@@ -13,32 +13,6 @@ import Anthropic from '@anthropic-ai/sdk';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
-// ── LATIN CULTURE INTAKE GATE ──
-// Only events that pass this check are stored as SABOR Picks.
-// Non-matching events are dropped — they don't belong in the sabor_events collection.
-const LATIN_SIGNALS = [
-  'taco','taqueria','tacos','tamale','tamales','elote','elotes','pozole','birria',
-  'mexican','latina','latino','latinx','latin','caribbean','cuban','colombian',
-  'peruvian','salvadoran','guatemalan','honduran','dominican','puerto rican',
-  'venezolano','tex-mex','ceviche','horchata','pan dulce','churro','cumbia',
-  'salsa','merengue','afrolatino','cocina','sabor','quinceañera','quinceanera',
-  'dia de los muertos','cinco de mayo','hispanic','chicano','chicana',
-  'taquero','panaderia','carnitas','al pastor','torta','quesadilla','margarita',
-  'mezcal','tequila','michelada','tepache','champurrado','atole','mole',
-  'enchilada','tamale','pupusa','platano','yuca','arroz con leche',
-];
-
-function isLatinCulturalEvent(event) {
-  const text = [
-    event.title || '',
-    event.description || '',
-    event.venue || '',
-    event.neighborhood || '',
-    ...(event.tags || []),
-  ].join(' ').toLowerCase();
-  return LATIN_SIGNALS.some(s => text.includes(s));
-}
-
 if (!getApps().length) {
   const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
   initializeApp({ credential: cert(serviceAccount) });
@@ -238,16 +212,8 @@ async function storeEvents(events, city) {
     'brunch': '🥂', 'class': '👨‍🍳', 'food_truck': '🌮', 'special': '⭐', 'market': '🏪',
   };
 
-  let skipped = 0;
   for (const event of events) {
     if (!event.title || !event.venue) continue;
-
-    // ── LATIN CULTURE GATE: only store events that are Latin/food-culture verified ──
-    if (!isLatinCulturalEvent(event)) {
-      console.log(`scout-events: skipped non-Latin event: "${event.title}" @ ${event.venue}`);
-      skipped++;
-      continue;
-    }
 
     const idBase = `${event.title}_${event.venue}`.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 50);
     const docId = `scout_${idBase}`;
@@ -276,11 +242,10 @@ async function storeEvents(events, city) {
       recurring: isOngoing,
       confidence: event.confidence || 'medium',
       scoutedAt: now.toISOString(),
-      expiresAt: new Date(now.getTime() + (isOngoing ? 7 : 14) * 86400000).toISOString(),
+      expiresAt: new Date(now.getTime() + (isOngoing ? 7 : 30) * 86400000).toISOString(),
     }, { merge: true });
     stored++;
   }
-  if (skipped > 0) console.log(`scout-events: ${skipped} non-Latin events filtered at intake gate`);
 
   await batch.commit();
   return stored;
