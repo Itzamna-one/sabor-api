@@ -378,7 +378,7 @@ export default async function handler(req, res) {
       image: null,
       premiumOnly: false,
       earlyAccess: false,
-      source: 'SABOR Cultural',
+      source: 'SABOR',
       recurring: true,
       scoutedAt: now,
       expiresAt: expiry,
