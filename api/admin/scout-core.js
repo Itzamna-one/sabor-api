@@ -121,8 +121,7 @@ function deriveTags(cuisine, neighborhoodSlug) {
   const latinNeighborhoods = ['pilsen','little-village','back-of-the-yards','gage-park','brighton-park','humboldt-park'];
   if (latinNeighborhoods.includes(neighborhoodSlug)) tags.push('authentic', 'community');
   if (cuisine === 'Mexican') tags.push('tacos');
-  if (cuisine === 'Puerto Rican') tags.push('jibaritos');
-  return tags;
+return tags;
 }
 
 function delay(ms) {
@@ -207,14 +206,29 @@ export async function scoutNeighborhood(citySlug, cityLabel, neighborhoodSlug, n
 
   const now = new Date().toISOString();
   const collection = db.collection('directory_spots');
+
+  // Build all doc IDs and filter out empty slugs
+  const candidates = spots.map(spot => {
+    const slug = toSlug(spot.name);
+    const docId = slug ? `${citySlug}_${neighborhoodSlug}_${slug}` : null;
+    return { spot, slug, docId };
+  });
+
+  const valid = candidates.filter(c => c.docId !== null);
+  const skipped = candidates.length - valid.length;
+
+  // Parallelize all existence checks
+  const existingDocs = await Promise.all(
+    valid.map(c => collection.doc(c.docId).get())
+  );
+
+  // Batch all writes
+  const batch = db.batch();
   let upserted = 0;
 
-  for (const spot of spots) {
-    const slug = toSlug(spot.name);
-    if (!slug) continue;
-    const docId = `${citySlug}_${neighborhoodSlug}_${slug}`;
-
-    const existing = await collection.doc(docId).get();
+  for (let i = 0; i < valid.length; i++) {
+    const { spot, slug, docId } = valid[i];
+    const existing = existingDocs[i];
     const isNew = !existing.exists;
     const isClaimed = existing.exists && existing.data()?.source === 'claimed';
 
@@ -246,9 +260,10 @@ export async function scoutNeighborhood(citySlug, cityLabel, neighborhoodSlug, n
       }),
     };
 
-    await collection.doc(docId).set(update, { merge: true });
+    batch.set(collection.doc(docId), update, { merge: true });
     upserted++;
   }
 
-  return { found: places.length, upserted, skipped: 0 };
+  await batch.commit();
+  return { found: places.length, upserted, skipped };
 }
