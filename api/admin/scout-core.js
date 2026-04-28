@@ -92,6 +92,9 @@ const TYPE_TO_CUISINE = {
   'indian_restaurant':         'Indian',
   'korean_restaurant':         'Korean',
   'italian_restaurant':        'Italian',
+  'food_truck':                'Street Food',
+  'meal_takeaway':             'Street Food',
+  'meal_delivery':             'Street Food',
 };
 
 export function toSlug(s) {
@@ -116,19 +119,20 @@ function getCuisine(types = []) {
   return 'Latin American';
 }
 
-function deriveTags(cuisine, neighborhoodSlug) {
+function deriveTags(cuisine, neighborhoodSlug, isTruck) {
   const tags = [cuisine.toLowerCase()];
   const latinNeighborhoods = ['pilsen','little-village','back-of-the-yards','gage-park','brighton-park','humboldt-park'];
   if (latinNeighborhoods.includes(neighborhoodSlug)) tags.push('authentic', 'community');
   if (cuisine === 'Mexican') tags.push('tacos');
-return tags;
+  if (isTruck) tags.push('food truck', 'street food');
+  return tags;
 }
 
 function delay(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
 
-async function searchPlaces(neighborhoodLabel, cityLabel, coords, apiKey) {
+async function searchPlaces(query, coords, apiKey) {
   const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
     method: 'POST',
     headers: {
@@ -137,7 +141,7 @@ async function searchPlaces(neighborhoodLabel, cityLabel, coords, apiKey) {
       'X-Goog-FieldMask': 'places.displayName,places.id,places.rating,places.userRatingCount,places.priceLevel,places.formattedAddress,places.location,places.photos,places.businessStatus,places.types,places.primaryType',
     },
     body: JSON.stringify({
-      textQuery: `restaurant ${neighborhoodLabel} ${cityLabel}`,
+      textQuery: query,
       maxResultCount: 15,
       locationBias: {
         circle: {
@@ -186,21 +190,36 @@ export async function scoutNeighborhood(citySlug, cityLabel, neighborhoodSlug, n
   if (!apiKey) throw new Error('GOOGLE_PLACES_KEY not set');
 
   const coords = getCoords(citySlug, neighborhoodSlug);
-  const places = await searchPlaces(neighborhoodLabel, cityLabel, coords, apiKey);
+  const [restaurants, trucks] = await Promise.all([
+    searchPlaces(`restaurant ${neighborhoodLabel} ${cityLabel}`, coords, apiKey),
+    searchPlaces(`food truck taquero elotero ${neighborhoodLabel} ${cityLabel}`, coords, apiKey),
+  ]);
+  const seenIds = new Set();
+  const places = [...restaurants, ...trucks].filter(p => {
+    if (seenIds.has(p.id)) return false;
+    seenIds.add(p.id);
+    return true;
+  });
 
-  const spots = places.map(p => ({
-    name: p.displayName?.text || '',
-    cuisine: getCuisine(p.types || []),
-    address: p.formattedAddress || '',
-    lat: p.location?.latitude ?? 0,
-    lng: p.location?.longitude ?? 0,
-    rating: p.rating ?? 0,
-    reviewCount: p.userRatingCount ?? 0,
-    priceLevel: { PRICE_LEVEL_INEXPENSIVE: 1, PRICE_LEVEL_MODERATE: 2, PRICE_LEVEL_EXPENSIVE: 3, PRICE_LEVEL_VERY_EXPENSIVE: 4 }[p.priceLevel] ?? 1,
-    photoUrl: p.photos?.[0]?.name
-      ? `https://sabor-api.vercel.app/api/photo?ref=${encodeURIComponent(p.photos[0].name)}`
-      : null,
-  })).filter(s => s.name);
+  const TRUCK_TYPES = new Set(['food_truck', 'meal_takeaway', 'meal_delivery']);
+  const spots = places.map(p => {
+    const types = p.types || [];
+    const isTruck = types.some(t => TRUCK_TYPES.has(t));
+    return {
+      name: p.displayName?.text || '',
+      cuisine: getCuisine(types),
+      isTruck,
+      address: p.formattedAddress || '',
+      lat: p.location?.latitude ?? 0,
+      lng: p.location?.longitude ?? 0,
+      rating: p.rating ?? 0,
+      reviewCount: p.userRatingCount ?? 0,
+      priceLevel: { PRICE_LEVEL_INEXPENSIVE: 1, PRICE_LEVEL_MODERATE: 2, PRICE_LEVEL_EXPENSIVE: 3, PRICE_LEVEL_VERY_EXPENSIVE: 4 }[p.priceLevel] ?? 1,
+      photoUrl: p.photos?.[0]?.name
+        ? `https://sabor-api.vercel.app/api/photo?ref=${encodeURIComponent(p.photos[0].name)}`
+        : null,
+    };
+  }).filter(s => s.name);
 
   const descriptions = await generateDescriptions(spots, neighborhoodLabel, cityLabel);
 
@@ -248,7 +267,8 @@ export async function scoutNeighborhood(citySlug, cityLabel, neighborhoodSlug, n
       rating: spot.rating,
       reviewCount: spot.reviewCount,
       priceLevel: spot.priceLevel,
-      tags: deriveTags(spot.cuisine, neighborhoodSlug),
+      spotType: spot.isTruck ? 'truck' : 'restaurant',
+      tags: deriveTags(spot.cuisine, neighborhoodSlug, spot.isTruck),
       source: isClaimed ? 'claimed' : 'scouted',
       tier: isNew ? 'free' : (existing.data()?.tier ?? 'free'),
       updatedAt: now,
