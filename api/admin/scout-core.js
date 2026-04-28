@@ -202,13 +202,18 @@ export async function scoutNeighborhood(citySlug, cityLabel, neighborhoodSlug, n
   });
 
   const TRUCK_TYPES = new Set(['food_truck', 'meal_takeaway', 'meal_delivery']);
+  const TRUCK_NAME_RE = /\b(food\s+truck|taco\s+truck|taco\s+cart|\btruck\b)/i;
+  const VENDOR_NAME_RE = /\b(elotes?|elotero|tamale\s+(lady|man|cart|vendor)|tamalera|tamalero|cart\b)/i;
   const spots = places.map(p => {
     const types = p.types || [];
-    const isTruck = types.some(t => TRUCK_TYPES.has(t));
+    const name = p.displayName?.text || '';
+    const isTruck = types.some(t => TRUCK_TYPES.has(t)) || TRUCK_NAME_RE.test(name);
+    const isVendor = !isTruck && VENDOR_NAME_RE.test(name);
     return {
-      name: p.displayName?.text || '',
+      name,
       cuisine: getCuisine(types),
       isTruck,
+      isVendor,
       address: p.formattedAddress || '',
       lat: p.location?.latitude ?? 0,
       lng: p.location?.longitude ?? 0,
@@ -267,7 +272,7 @@ export async function scoutNeighborhood(citySlug, cityLabel, neighborhoodSlug, n
       rating: spot.rating,
       reviewCount: spot.reviewCount,
       priceLevel: spot.priceLevel,
-      spotType: spot.isTruck ? 'truck' : 'restaurant',
+      spotType: spot.isTruck ? 'truck' : spot.isVendor ? 'street_vendor' : 'restaurant',
       tags: deriveTags(spot.cuisine, neighborhoodSlug, spot.isTruck),
       source: isClaimed ? 'claimed' : 'scouted',
       tier: isNew ? 'free' : (existing.data()?.tier ?? 'free'),
