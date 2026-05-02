@@ -67,8 +67,9 @@ export default async function handler(req, res) {
     }
 
     // Send to all tokens, optionally filtered by city and/or language
+    // Normalize city to match how registerToken() stores it: "Chicago, IL" → "chicago"
     let query = db.collection('fcm_tokens');
-    if (city) query = query.where('city', '==', city.toLowerCase());
+    if (city) query = query.where('city', '==', city.split(',')[0].trim().toLowerCase());
     if (language) query = query.where('language', '==', language.toLowerCase());
     const snapshot = await query.get();
     if (snapshot.empty) {
