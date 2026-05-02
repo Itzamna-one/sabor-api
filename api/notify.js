@@ -95,7 +95,11 @@ export default async function handler(req, res) {
     // Clean up invalid tokens
     const failedTokens = [];
     response.responses.forEach((resp, idx) => {
-      if (!resp.success && resp.error?.code === 'messaging/registration-token-not-registered') {
+      const INVALID_TOKEN_CODES = [
+        'messaging/registration-token-not-registered',
+        'messaging/invalid-registration-token',
+      ];
+      if (!resp.success && INVALID_TOKEN_CODES.includes(resp.error?.code)) {
         failedTokens.push(tokens[idx]);
       }
     });
