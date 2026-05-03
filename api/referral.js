@@ -76,8 +76,13 @@ async function getStats() {
     (b.paidConversions || 0) - (a.paidConversions || 0)
   );
   const totals = codes.reduce(
-    (acc, c) => ({ signups: acc.signups + (c.signups || 0), paid: acc.paid + (c.paidConversions || 0) }),
-    { signups: 0, paid: 0 }
+    (acc, c) => ({
+      signups:              acc.signups              + (c.signups              || 0),
+      paid:                 acc.paid                 + (c.paidConversions      || 0),
+      ownerSignups:         acc.ownerSignups         + (c.ownerSignups         || 0),
+      ownerCommissionTotal: acc.ownerCommissionTotal + (c.ownerCommissionTotal || 0),
+    }),
+    { signups: 0, paid: 0, ownerSignups: 0, ownerCommissionTotal: 0 }
   );
   return { codes, totals };
 }
