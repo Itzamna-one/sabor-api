@@ -129,6 +129,72 @@ const CITY_NEIGHBORHOODS = {
     { name: 'Higgins Road',     emoji: '🌮', vibe: 'Latin · Casual' },
     { name: 'Algonquin Road',   emoji: '🌍', vibe: 'Diverse Corridor' },
   ],
+  // Chicago Inner Suburbs — Latino-heavy communities (added for GPS coverage)
+  'Skokie, IL': [
+    { name: 'Downtown Skokie',  emoji: '🌍', vibe: 'Global · Korean · Mexican' },
+    { name: 'Dempster Street',  emoji: '🌮', vibe: 'Taquería Row · Auténtico' },
+    { name: 'Old Orchard Area', emoji: '🍜', vibe: 'Asian Fusion · Diverse' },
+    { name: 'Lincoln Ave',      emoji: '💎', vibe: 'Hidden Gems · Local' },
+  ],
+  'Melrose Park, IL': [
+    { name: 'Lake Street',      emoji: '🔥', vibe: 'Little Mexico · Tacos' },
+    { name: 'Broadway',         emoji: '🌮', vibe: 'Auténtico · Family' },
+    { name: 'North Ave',        emoji: '💎', vibe: 'Hidden · Local Spots' },
+    { name: 'Ruby Street',      emoji: '🌮', vibe: 'Street Food · Trucks' },
+  ],
+  'Addison, IL': [
+    { name: 'Lake Street',      emoji: '🌮', vibe: 'Taquerías · Casual' },
+    { name: 'Army Trail Road',  emoji: '🌍', vibe: 'Diverse · Family' },
+    { name: 'Addison Road',     emoji: '🍜', vibe: 'Asian · Mexican Mix' },
+    { name: 'Villa Park Area',  emoji: '💎', vibe: 'Local Finds' },
+  ],
+  'Maywood, IL': [
+    { name: '5th Ave',          emoji: '🌮', vibe: 'Mexican Corridor' },
+    { name: 'Lake Street',      emoji: '🍗', vibe: 'Soul Food · BBQ · Local' },
+    { name: 'Madison Street',   emoji: '💎', vibe: 'Hidden · Neighborhood' },
+    { name: 'Roosevelt Rd',     emoji: '🔥', vibe: 'Tacos · Street Food' },
+  ],
+  'Stone Park, IL': [
+    { name: 'Mannheim Road',    emoji: '🌮', vibe: 'Deep-Dish Latino · Auténtico' },
+    { name: 'Lake Street',      emoji: '🔥', vibe: 'Taquerías · Carnitas' },
+    { name: 'North Ave',        emoji: '💎', vibe: 'Hidden Gems · Local' },
+  ],
+  'Franklin Park, IL': [
+    { name: 'Grand Ave',        emoji: '🌮', vibe: 'Mexican · Polish Mix' },
+    { name: 'Mannheim Road',    emoji: '🍔', vibe: 'Casual · Family Dining' },
+    { name: 'Belmont Ave',      emoji: '💎', vibe: 'Local Finds · Diverse' },
+  ],
+  'Hanover Park, IL': [
+    { name: 'Lake Street',      emoji: '🌮', vibe: 'Taquería Row · Auténtico' },
+    { name: 'Barrington Rd',    emoji: '🍜', vibe: 'Asian · Diverse' },
+    { name: 'Irving Park Road', emoji: '💎', vibe: 'Hidden · Family Spots' },
+  ],
+  'Carpentersville, IL': [
+    { name: 'Main Street',      emoji: '🌮', vibe: 'Tacos · Carnitas · Auténtico' },
+    { name: 'Route 25',         emoji: '🔥', vibe: 'Mexican Corridor' },
+    { name: 'Sleepy Hollow Rd', emoji: '💎', vibe: 'Local Hidden Gems' },
+  ],
+  'Zion, IL': [
+    { name: 'Sheridan Road',    emoji: '🌮', vibe: 'Latin · Diverse' },
+    { name: 'Shiloh Blvd',     emoji: '🍔', vibe: 'Family · Casual' },
+    { name: 'Benton Street',    emoji: '💎', vibe: 'Local Spots' },
+  ],
+  'Blue Island, IL': [
+    { name: 'Western Ave',      emoji: '🌮', vibe: 'Mexican · Soul Food' },
+    { name: 'Vermont Street',   emoji: '💎', vibe: 'Hidden · Local' },
+    { name: 'Vincennes Ave',    emoji: '🍗', vibe: 'BBQ · Comfort Food' },
+  ],
+  'Harvey, IL': [
+    { name: '154th Street',     emoji: '🍗', vibe: 'Soul Food · BBQ' },
+    { name: 'Dixie Highway',    emoji: '🌮', vibe: 'Mexican · Diverse' },
+    { name: 'Halsted Street',   emoji: '💎', vibe: 'Local Finds' },
+  ],
+  'Calumet City, IL': [
+    { name: 'Torrence Ave',     emoji: '🌮', vibe: 'Mexican · Soul Food Mix' },
+    { name: 'River Oaks Area',  emoji: '🍔', vibe: 'Family · Casual' },
+    { name: '170th Street',     emoji: '💎', vibe: 'Local Hidden Gems' },
+    { name: 'Burnham Ave',      emoji: '🍗', vibe: 'BBQ · Comfort' },
+  ],
 
   // ═══════════════════════════════════════
   // INDIANA

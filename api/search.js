@@ -266,11 +266,27 @@ const CITY_GEO = {
   'lafayette':      { lat: 40.4167, lng: -86.8753 },
   'muncie':         { lat: 40.1934, lng: -85.3864 },
   'michigan city':  { lat: 41.7075, lng: -86.8950 },
+  // Chicago inner suburbs — Latino-heavy communities
+  'skokie':         { lat: 42.0334, lng: -87.7335 },
+  'melrose park':   { lat: 41.9003, lng: -87.8561 },
+  'addison':        { lat: 41.9314, lng: -87.9887 },
+  'maywood':        { lat: 41.8797, lng: -87.8434 },
+  'stone park':     { lat: 41.9039, lng: -87.8753 },
+  'franklin park':  { lat: 41.9314, lng: -87.8783 },
+  'hanover park':   { lat: 41.9994, lng: -88.1434 },
+  'carpentersville': { lat: 42.1214, lng: -88.2578 },
+  'zion':           { lat: 42.4461, lng: -87.8409 },
+  'blue island':    { lat: 41.6578, lng: -87.6806 },
+  'harvey':         { lat: 41.6100, lng: -87.6467 },
+  'calumet city':   { lat: 41.6153, lng: -87.5298 },
 };
 
-function getSearchGeo(city) {
+function getSearchGeo(city, userLat, userLng) {
   const key = city.toLowerCase().split(',')[0].trim();
-  return CITY_GEO[key] || CITY_GEO['chicago'];
+  if (CITY_GEO[key]) return CITY_GEO[key];
+  // Use raw GPS when city isn't in the list — prevents Chicago fallback for suburbs
+  if (userLat && userLng) return { lat: userLat, lng: userLng };
+  return CITY_GEO['chicago'];
 }
 
 // ── Chicago address-to-neighborhood resolver ──
@@ -588,7 +604,7 @@ function resolveChicagoNeighborhood(address) {
 // Detect street food / carts / trucks — these shouldn't have "restaurant" appended
 const STREET_FOOD_KEYWORDS = /\b(cart|truck|stand|vendor|paletero|elotero|tamale|tamal|street food|food truck|pop-?up|market|mercado|feria|tianguis|puesto)\b/i;
 
-async function lookupRealNeighborhood(name, city) {
+async function lookupRealNeighborhood(name, city, userLat, userLng) {
   if (!name) return null;
 
   const cacheKey = `${name}|${city}`.toLowerCase();
@@ -602,7 +618,7 @@ async function lookupRealNeighborhood(name, city) {
     // Strip "— Neighborhood" suffix from name if present (AI often adds it)
     const cleanName = name.replace(/\s*[—–-]\s*[A-Z][a-zA-Z\s]+$/, '').trim();
     const isStreet = STREET_FOOD_KEYWORDS.test(cleanName);
-    const geo = getSearchGeo(city);
+    const geo = getSearchGeo(city, userLat, userLng);
 
     // Try 1: search with appropriate suffix
     const suffix = isStreet ? '' : ' restaurant';
@@ -743,10 +759,10 @@ function shortenNeighborhood(hood) {
   return shortMap[hood] || hood;
 }
 
-async function verifyNeighborhoods(results, city) {
+async function verifyNeighborhoods(results, city, userLat, userLng) {
   if (!results || results.length === 0) return results;
   const apiKey = process.env.GOOGLE_PLACES_KEY;
-  const geo = getSearchGeo(city);
+  const geo = getSearchGeo(city, userLat, userLng);
 
   const promises = results.map(async (r) => {
     try {
@@ -768,7 +784,7 @@ async function verifyNeighborhoods(results, city) {
       }
 
       // Step 1: Try name lookup (works for real restaurant names)
-      const realData = await lookupRealNeighborhood(r.name, city);
+      const realData = await lookupRealNeighborhood(r.name, city, userLat, userLng);
       if (realData) {
         if (realData.neighborhood) {
           if (realData.neighborhood !== r.neighborhood) {
@@ -863,6 +879,8 @@ export default async function handler(req, res) {
     language = 'es',
     conSabor = false,
     localHour = null,
+    userLat = null,
+    userLng = null,
   } = req.body;
 
   if (!query) return res.status(400).json({ error: "Query is required" });
@@ -1223,7 +1241,7 @@ Reglas críticas:
     // This fixes AI-hallucinated addresses AND neighborhoods in one shot
     if (parsed.results) {
       try {
-        parsed.results = await verifyNeighborhoods(parsed.results, city);
+        parsed.results = await verifyNeighborhoods(parsed.results, city, userLat, userLng);
       } catch (verifyErr) {
         console.error('Neighborhood verification failed (returning unverified):', verifyErr.message);
         // Return results without verification rather than 500

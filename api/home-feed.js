@@ -70,11 +70,24 @@ const CITY_GEO = {
   'lafayette':      { lat: 40.4167, lng: -86.8753 },
   'muncie':         { lat: 40.1934, lng: -85.3864 },
   'michigan city':  { lat: 41.7075, lng: -86.8950 },
+  // Chicago inner suburbs — Latino-heavy communities
+  'skokie':         { lat: 42.0334, lng: -87.7335 },
+  'melrose park':   { lat: 41.9003, lng: -87.8561 },
+  'addison':        { lat: 41.9314, lng: -87.9887 },
+  'maywood':        { lat: 41.8797, lng: -87.8434 },
+  'stone park':     { lat: 41.9039, lng: -87.8753 },
+  'franklin park':  { lat: 41.9314, lng: -87.8783 },
+  'hanover park':   { lat: 41.9994, lng: -88.1434 },
+  'carpentersville': { lat: 42.1214, lng: -88.2578 },
+  'zion':           { lat: 42.4461, lng: -87.8409 },
+  'blue island':    { lat: 41.6578, lng: -87.6806 },
+  'harvey':         { lat: 41.6100, lng: -87.6467 },
+  'calumet city':   { lat: 41.6153, lng: -87.5298 },
 };
 
 function getCityGeo(city) {
   const cityKey = city.toLowerCase().split(',')[0].trim();
-  return CITY_GEO[cityKey] || CITY_GEO['chicago']; // fallback to Chicago
+  return CITY_GEO[cityKey] || CITY_GEO['chicago'];
 }
 
 // ─── Google Places enrichment (with geo-bias) ───
