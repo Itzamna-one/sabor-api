@@ -192,8 +192,15 @@ function formatPredictHQForClaude(phqEvents, city) {
       price: 'See event',
       url: `https://predicthq.com/events/${e.id}`,
       image: null,
+      _countryCode: e.geo?.address?.country_code || '',
+      _region: e.geo?.address?.region || '',
     };
-  }).filter(e => e.title);
+  }).filter(e => {
+    if (!e.title) return false;
+    // Drop events outside the US — PredictHQ's radius occasionally leaks global results
+    if (e._countryCode && e._countryCode !== 'US') return false;
+    return true;
+  }).map(({ _countryCode, _region, ...e }) => e);
 }
 
 function formatEventbriteForClaude(ebEvents, city) {
@@ -284,12 +291,14 @@ async function enrichEvents(formatted, city) {
   for (const chunk of chunks) {
     const prompt = `You are a food event curator for SABOR, a food discovery app in ${cityName}. Today is ${today}.
 
-From these ${chunk.length} events (from Ticketmaster and Eventbrite), select ONLY genuinely food or drink related ones.
+From these ${chunk.length} events (from Ticketmaster and PredictHQ), select ONLY events that are BOTH food/drink related AND located in or near ${cityName}.
+
+GEOGRAPHY: Only include events actually happening in ${cityName} or its immediate suburbs. REJECT any event whose venue or address is in a different city, state, or country.
 
 INCLUDE: Food festivals, tastings, wine/beer/cocktail events, brunch events, dinner shows, chef events, cooking classes, events at restaurants/breweries/wineries, cultural food festivals, BBQ, night markets, pop-ups, happy hours WITH notable food (apps, bites, specials — not just drinks), prix fixe dinners.
 EXCLUDE happy hours that are drinks-only with no food component.
 
-EXCLUDE: Pure concerts/sports with no food angle, conferences, events before ${today}.
+EXCLUDE: Events in wrong cities/states, pure concerts/sports with no food angle, conferences, events before ${today}.
 NO DUPLICATES: Same event at different dates → list ONCE with earliest date.
 
 EVENTS:
