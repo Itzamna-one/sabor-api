@@ -330,6 +330,21 @@ async function storeEvents(events, city) {
     const docId = `scout_${idBase}`;
     const isOngoing = /ongoing|every|weekly|daily/i.test(event.date || '');
 
+    // Expire 1 day after the event date so past events clean up quickly
+    // but upcoming events stay visible until they actually happen.
+    // Falls back to 14 days if we can't parse the date.
+    let expiresAt;
+    if (event.date && !isOngoing) {
+      try {
+        const parsed = new Date(event.date);
+        expiresAt = isNaN(parsed.getTime())
+          ? new Date(now.getTime() + 14 * 86400000)
+          : new Date(parsed.getTime() + 86400000); // event date + 1 day
+      } catch { expiresAt = new Date(now.getTime() + 14 * 86400000); }
+    } else {
+      expiresAt = new Date(now.getTime() + 7 * 86400000); // recurring: refresh weekly
+    }
+
     batch.set(collection.doc(docId), {
       id: docId,
       title: event.title,
@@ -353,7 +368,7 @@ async function storeEvents(events, city) {
       recurring: isOngoing,
       confidence: event.confidence || 'medium',
       scoutedAt: now.toISOString(),
-      expiresAt: new Date(now.getTime() + 7 * 86400000).toISOString(),
+      expiresAt: expiresAt.toISOString(),
     }, { merge: true });
     stored++;
   }
