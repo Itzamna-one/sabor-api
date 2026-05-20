@@ -96,50 +96,67 @@ async function collectEvents(city) {
     return true;
   });
 
-  // ── EVENTBRITE ──
-  const ebToken = process.env.EVENTBRITE_API_TOKEN;
-  const ebRaw = await searchEventbrite(city, ebToken);
-  const ebFormatted = formatEventbriteForClaude(ebRaw, city);
+  // ── PREDICTHQ ──
+  const phqKey = process.env.PREDICTHQ_API_KEY;
+  const phqRaw = await searchPredictHQ(city, phqKey);
+  const phqFormatted = formatPredictHQForClaude(phqRaw, city);
 
-  return { tmEvents: tmUnique, ebEvents: ebFormatted, errors };
+  return { tmEvents: tmUnique, ebEvents: phqFormatted, errors };
 }
 
-// ── EVENTBRITE SEARCH ──
-async function searchEventbrite(city, apiToken) {
-  if (!apiToken) return [];
+// ── PREDICTHQ SEARCH ──
+// Replaces Eventbrite (deprecated public search API as of 2024).
+// Free tier: 500 events/month at predicthq.com — set PREDICTHQ_API_KEY env var to activate.
+async function searchPredictHQ(city, apiKey) {
+  if (!apiKey) return [];
 
   const cityName = city.split(',')[0].trim();
   const today = new Date();
-  const start = today.toISOString().split('.')[0] + 'Z';
-  const end = new Date(today.getTime() + 30 * 86400000).toISOString().split('.')[0] + 'Z';
-  const base = `https://www.eventbriteapi.com/v3/events/search/?location.address=${encodeURIComponent(city)}&location.within=25mi&start_date.range_start=${start}&start_date.range_end=${end}&expand=venue,ticket_availability&page_size=50`;
-  const headers = { Authorization: `Bearer ${apiToken}` };
-  const results = [];
+  const start = today.toISOString().split('T')[0];
+  const end = new Date(today.getTime() + 30 * 86400000).toISOString().split('T')[0];
 
   try {
-    // Food & Drink category (110) — best signal
-    const catResp = await fetch(`${base}&categories=110`, { headers, signal: AbortSignal.timeout(8000) });
-    if (catResp.ok) results.push(...((await catResp.json()).events || []));
-
-    // Latin/food keywords Eventbrite is good at
-    const keywords = ['taco', 'tamale', 'birria', 'latin food', 'food festival', 'night market', 'pop up food', 'brunch', 'cooking class'];
-    for (let i = 0; i < keywords.length; i += 3) {
-      const batch = keywords.slice(i, i + 3);
-      const batchResults = await Promise.all(batch.map(async kw => {
-        try {
-          const r = await fetch(`${base}&q=${encodeURIComponent(kw)}`, { headers, signal: AbortSignal.timeout(6000) });
-          return r.ok ? ((await r.json()).events || []) : [];
-        } catch { return []; }
-      }));
-      results.push(...batchResults.flat());
-      if (i + 3 < keywords.length) await new Promise(r => setTimeout(r, 200));
-    }
+    const url = `https://api.predicthq.com/v1/events/?category=festivals,community,food-drink&location_around.origin=${encodeURIComponent(cityName)}&start.gte=${start}&start.lte=${end}&limit=100&sort=start`;
+    const resp = await fetch(url, {
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return data.results || [];
   } catch (err) {
-    console.error('Eventbrite error:', err.message);
+    console.error('PredictHQ error:', err.message);
+    return [];
   }
+}
 
-  const seen = new Set();
-  return results.filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true; });
+function formatPredictHQForClaude(phqEvents, city) {
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const cityName = city.split(',')[0].trim();
+
+  return phqEvents.map(e => {
+    const startLocal = e.start || '';
+    let dateStr = '', timeStr = '';
+    if (startLocal) {
+      const d = new Date(startLocal);
+      dateStr = `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+      const h = d.getHours(), m = d.getMinutes();
+      if (h || m) timeStr = `${h === 0 ? 12 : h > 12 ? h - 12 : h}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+    }
+    return {
+      title: e.title || '',
+      description: (e.description || '').substring(0, 300),
+      venue: e.entities?.find(en => en.type === 'venue')?.name || cityName,
+      address: e.location ? `${e.location[1]}, ${e.location[0]}` : '',
+      city: cityName,
+      date: dateStr,
+      time: timeStr,
+      price: 'See event',
+      url: e.url || '',
+      image: null,
+    };
+  }).filter(e => e.title);
 }
 
 function formatEventbriteForClaude(ebEvents, city) {
