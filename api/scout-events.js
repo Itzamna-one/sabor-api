@@ -96,10 +96,25 @@ async function collectEvents(city) {
     return true;
   });
 
-  // ── PREDICTHQ ──
+  // ── PREDICTHQ — skip if city has fresh events (saves free-tier quota) ──
+  // Check Firestore: if >= 5 unexpired events were scouted within 3 days, skip.
   const phqKey = process.env.PREDICTHQ_API_KEY;
-  const phqRaw = await searchPredictHQ(city, phqKey);
-  const phqFormatted = formatPredictHQForClaude(phqRaw, city);
+  let phqFormatted = [];
+  if (phqKey) {
+    const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString();
+    const freshSnap = await db.collection('sabor_events')
+      .where('city', '==', city)
+      .where('scoutedAt', '>', threeDaysAgo)
+      .limit(5)
+      .get();
+
+    if (freshSnap.size >= 5) {
+      errors.push(`phq_skipped: ${city} has ${freshSnap.size}+ fresh events`);
+    } else {
+      const phqRaw = await searchPredictHQ(city, phqKey);
+      phqFormatted = formatPredictHQForClaude(phqRaw, city);
+    }
+  }
 
   return { tmEvents: tmUnique, ebEvents: phqFormatted, errors };
 }
