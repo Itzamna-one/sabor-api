@@ -104,24 +104,37 @@ async function collectEvents(city) {
   return { tmEvents: tmUnique, ebEvents: phqFormatted, errors };
 }
 
+// city slug → lat,lng for PredictHQ location search
+const CITY_COORDS = {
+  'Chicago, IL':      '41.8781,-87.6298',
+  'Indianapolis, IN': '39.7684,-86.1581',
+  'Aurora, IL':       '41.7606,-88.3201',
+  'Waukegan, IL':     '42.3636,-87.8448',
+  'Elgin, IL':        '42.0354,-88.2826',
+  'Cicero, IL':       '41.8456,-87.7539',
+  'Joliet, IL':       '41.5250,-88.0817',
+  'Berwyn, IL':       '41.8506,-87.7940',
+};
+
 // ── PREDICTHQ SEARCH ──
 // Replaces Eventbrite (deprecated public search API as of 2024).
-// Free tier: 500 events/month at predicthq.com — set PREDICTHQ_API_KEY env var to activate.
+// Free tier: 500 events/month at predicthq.com — set PREDICTHQ_API_KEY env var.
+// Valid categories: festivals, community, expos, concerts, performing-arts
 async function searchPredictHQ(city, apiKey) {
   if (!apiKey) return [];
 
-  const cityName = city.split(',')[0].trim();
+  const coords = CITY_COORDS[city] || CITY_COORDS['Chicago, IL'];
   const today = new Date();
   const start = today.toISOString().split('T')[0];
   const end = new Date(today.getTime() + 30 * 86400000).toISOString().split('T')[0];
 
   try {
-    const url = `https://api.predicthq.com/v1/events/?category=festivals,community,food-drink&location_around.origin=${encodeURIComponent(cityName)}&start.gte=${start}&start.lte=${end}&limit=100&sort=start`;
+    const url = `https://api.predicthq.com/v1/events/?category=festivals,community,expos&location_around.origin=${coords}&location_around.offset=25mi&start.gte=${start}&start.lte=${end}&limit=100&sort=start`;
     const resp = await fetch(url, {
       headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
       signal: AbortSignal.timeout(8000),
     });
-    if (!resp.ok) return [];
+    if (!resp.ok) { console.error('PredictHQ error:', resp.status, await resp.text()); return []; }
     const data = await resp.json();
     return data.results || [];
   } catch (err) {
@@ -136,24 +149,32 @@ function formatPredictHQForClaude(phqEvents, city) {
   const cityName = city.split(',')[0].trim();
 
   return phqEvents.map(e => {
-    const startLocal = e.start || '';
+    // start_local is "2026-05-24T18:00:00" — no timezone offset needed
+    const startLocal = e.start_local || '';
     let dateStr = '', timeStr = '';
     if (startLocal) {
-      const d = new Date(startLocal);
-      dateStr = `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
-      const h = d.getHours(), m = d.getMinutes();
-      if (h || m) timeStr = `${h === 0 ? 12 : h > 12 ? h - 12 : h}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+      const [datePart, timePart] = startLocal.split('T');
+      const [y, mo, d] = datePart.split('-').map(Number);
+      const dow = new Date(y, mo - 1, d).getDay();
+      dateStr = `${days[dow]}, ${months[mo - 1]} ${d}`;
+      if (timePart) {
+        const [h, m] = timePart.split(':').map(Number);
+        timeStr = `${h === 0 ? 12 : h > 12 ? h - 12 : h}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+      }
     }
+    const venueEntity = e.entities?.find(en => en.type === 'venue');
+    const address = e.geo?.address?.formatted_address || '';
+
     return {
       title: e.title || '',
-      description: (e.description || '').substring(0, 300),
-      venue: e.entities?.find(en => en.type === 'venue')?.name || cityName,
-      address: e.location ? `${e.location[1]}, ${e.location[0]}` : '',
+      description: (e.description || '').replace('Sourced from predicthq.com', '').trim().substring(0, 300),
+      venue: venueEntity?.name || address.split(',')[0] || cityName,
+      address,
       city: cityName,
       date: dateStr,
       time: timeStr,
       price: 'See event',
-      url: e.url || '',
+      url: `https://predicthq.com/events/${e.id}`,
       image: null,
     };
   }).filter(e => e.title);
