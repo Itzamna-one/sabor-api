@@ -96,23 +96,24 @@ async function collectEvents(city) {
     return true;
   });
 
-  // ── PREDICTHQ — skip if city has fresh events (saves free-tier quota) ──
-  // Check Firestore: if >= 5 unexpired events were scouted within 3 days, skip.
+  // ── PREDICTHQ — skip if city was scouted within 3 days (saves free-tier quota) ──
+  // Uses a lightweight meta doc instead of a compound query (no index needed).
   const phqKey = process.env.PREDICTHQ_API_KEY;
   let phqFormatted = [];
   if (phqKey) {
-    const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString();
-    const freshSnap = await db.collection('sabor_events')
-      .where('city', '==', city)
-      .where('scoutedAt', '>', threeDaysAgo)
-      .limit(5)
-      .get();
+    const citySlug = city.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    const metaRef = db.collection('phq_scout_meta').doc(citySlug);
+    const metaDoc = await metaRef.get();
+    const lastScouted = metaDoc.exists ? metaDoc.data().lastScoutedAt : null;
+    const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+    const isStale = !lastScouted || (Date.now() - new Date(lastScouted).getTime()) > threeDaysMs;
 
-    if (freshSnap.size >= 5) {
-      errors.push(`phq_skipped: ${city} has ${freshSnap.size}+ fresh events`);
+    if (!isStale) {
+      errors.push(`phq_skipped: ${city} scouted ${lastScouted}`);
     } else {
       const phqRaw = await searchPredictHQ(city, phqKey);
       phqFormatted = formatPredictHQForClaude(phqRaw, city);
+      await metaRef.set({ lastScoutedAt: new Date().toISOString(), city });
     }
   }
 
