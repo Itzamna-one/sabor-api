@@ -1,0 +1,8 @@
+# Never upload internal notes, tooling output or secrets to Vercel
+CLAUDE.md
+AGENTS.md
+docs/
+.gstack/
+.superpowers/
+.env
+.env.*

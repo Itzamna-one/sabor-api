@@ -4,3 +4,7 @@ node_modules/
 .env*.local
 .vercel/
 .gstack/
+
+# Secrets: ignore every .env variant (keep an example file shareable)
+.env*
+!.env.example
