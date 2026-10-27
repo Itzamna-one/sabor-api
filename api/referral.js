@@ -31,17 +31,22 @@ async function applyCode(uid, rawCode) {
 
   const code = rawCode.trim().toUpperCase();
   const codeRef = db.collection('referral_codes').doc(code);
-  const codeDoc = await codeRef.get();
+  const [codeDoc, profileDoc] = await Promise.all([
+    codeRef.get(),
+    db.collection('user_profiles').doc(uid).get(),
+  ]);
 
   if (!codeDoc.exists) return { error: 'Invalid referral code', status: 400 };
 
-  // Write referral code to user profile (merge — non-destructive)
+  // Idempotency — if code already applied for this user, don't double-count
+  if (profileDoc.exists && profileDoc.data()?.referralCode) {
+    return { ok: true, influencer: codeDoc.data().influencer };
+  }
+
   await db.collection('user_profiles').doc(uid).set(
     { referralCode: code, referralAppliedAt: FieldValue.serverTimestamp() },
     { merge: true }
   );
-
-  // Increment signup count on the code doc
   await codeRef.update({ signups: FieldValue.increment(1) });
 
   return { ok: true, influencer: codeDoc.data().influencer };
@@ -81,10 +86,43 @@ async function getStats() {
       paid:                 acc.paid                 + (c.paidConversions      || 0),
       ownerSignups:         acc.ownerSignups         + (c.ownerSignups         || 0),
       ownerCommissionTotal: acc.ownerCommissionTotal + (c.ownerCommissionTotal || 0),
+      activeSubTotal:       acc.activeSubTotal       + (c.activeSubCount       || 0),
     }),
-    { signups: 0, paid: 0, ownerSignups: 0, ownerCommissionTotal: 0 }
+    { signups: 0, paid: 0, ownerSignups: 0, ownerCommissionTotal: 0, activeSubTotal: 0 }
   );
   return { codes, totals };
+}
+
+async function createCode(name, phone, email) {
+  if (!name || !phone) return { error: 'name and phone are required', status: 400 };
+
+  const last4 = phone.replace(/\D/g, '').slice(-4);
+  const base = name.replace(/\s+/g, '').toUpperCase() + last4;
+
+  let code = base;
+  let counter = 1;
+  while (true) {
+    const existing = await db.collection('referral_codes').doc(code).get();
+    if (!existing.exists) break;
+    code = base + counter;
+    counter++;
+  }
+
+  await db.collection('referral_codes').doc(code).set({
+    code,
+    influencer: name,
+    phone,
+    email: email || null,
+    type: 'ambassador',
+    signups: 0,
+    paidConversions: 0,
+    ownerSignups: 0,
+    ownerCommissionTotal: 0,
+    activeSubCount: 0,
+    createdAt: new Date().toISOString(),
+  });
+
+  return { ok: true, code };
 }
 
 const SEED_CODES = [
@@ -104,7 +142,7 @@ async function seedCodes() {
       results.push({ code: entry.code, status: 'skipped' });
       continue;
     }
-    await ref.set({ ...entry, signups: 0, paidConversions: 0, createdAt: new Date().toISOString() });
+    await ref.set({ ...entry, signups: 0, paidConversions: 0, activeSubCount: 0, ownerSignups: 0, ownerCommissionTotal: 0, phone: '', email: null, createdAt: new Date().toISOString() });
     results.push({ code: entry.code, status: 'seeded' });
   }
   return results;
@@ -128,13 +166,20 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── POST — apply / conversion ──────────────────────────────────────────────
+  // ── POST — apply / conversion / create ────────────────────────────────────
   if (req.method === 'POST') {
-    if (!isAppKeyValid(req)) return res.status(401).json({ error: 'Unauthorized' });
-
-    const { action, uid, code } = req.body || {};
+    const { action, uid, code, name, phone, email } = req.body || {};
 
     try {
+      if (action === 'create') {
+        if (!isAdminValid(req)) return res.status(401).json({ error: 'Unauthorized' });
+        const result = await createCode(name, phone, email);
+        if (result.error) return res.status(result.status).json({ error: result.error });
+        return res.status(200).json(result);
+      }
+
+      if (!isAppKeyValid(req)) return res.status(401).json({ error: 'Unauthorized' });
+
       if (action === 'apply') {
         const result = await applyCode(uid, code);
         if (result.error) return res.status(result.status).json({ error: result.error });
@@ -147,7 +192,7 @@ export default async function handler(req, res) {
         return res.status(200).json(result);
       }
 
-      return res.status(400).json({ error: 'action must be "apply" or "conversion"' });
+      return res.status(400).json({ error: 'action must be "apply", "conversion", or "create"' });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
