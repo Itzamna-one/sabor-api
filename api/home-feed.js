@@ -1,6 +1,10 @@
 // api/home-feed.js — Home feed with caching, error handling, and fallback
 import Anthropic from '@anthropic-ai/sdk';
 import { checkAppKey, checkRateLimit, getClientIp } from '../lib/sabor-security.js';
+import { initSentry, captureException } from '../lib/sentry.js';
+
+initSentry();
+const FEED_MODEL = 'claude-sonnet-4-6';
 
 const cache = new Map();
 const CACHE_TTL = 600000; // 10 minutes
@@ -298,6 +302,7 @@ export default async function handler(req, res) {
     : '';
 
   let restaurants;
+  let source = 'claude';
   try {
     const anthropic = new Anthropic({ apiKey: ak });
     const exampleItems = Array.from({ length: count }, (_, i) =>
@@ -305,7 +310,7 @@ export default async function handler(req, res) {
     ).join(',');
 
     const msg = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: FEED_MODEL,
       max_tokens: 1200,
       messages: [{
         role: 'user',
@@ -345,7 +350,9 @@ Respond ONLY with valid JSON, no markdown: {"restaurants":[${exampleItems}]}`,
     if (!parsed?.restaurants?.length) throw new Error('Empty restaurant list');
     restaurants = parsed.restaurants;
   } catch (err) {
-    console.error('Home feed Claude error:', err.message);
+    // Never fail silently: report to Sentry + flag the response, and don't cache it
+    source = 'fallback';
+    captureException(err, { endpoint: 'home-feed', model: FEED_MODEL, city, section });
     // Use fallback data
     const cityKey = city.toLowerCase().split(',')[0].trim();
     restaurants = (FALLBACK_RESTAURANTS[cityKey] || FALLBACK_RESTAURANTS.chicago).slice(0, count);
@@ -374,7 +381,10 @@ Respond ONLY with valid JSON, no markdown: {"restaurants":[${exampleItems}]}`,
 
   // Filter out hallucinated restaurants that Google Places couldn't verify
   const verified = items.filter(item => item.places != null);
-  const data = { items: verified.length > 0 ? verified : items }; // fallback to all if none verified
-  cache.set(key, { ts: Date.now(), data });
+  const placesVerified = verified.length > 0;
+  if (!placesVerified) captureException(new Error('Google Places verified 0 items'), { endpoint: 'home-feed', city, section });
+  const data = { items: placesVerified ? verified : items, source, placesVerified }; // fallback to all if none verified
+  // Only cache healthy responses, so a transient outage isn't served for 10 minutes
+  if (source === 'claude' && placesVerified) cache.set(key, { ts: Date.now(), data });
   return res.status(200).json(data);
 }

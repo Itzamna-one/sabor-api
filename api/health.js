@@ -36,18 +36,40 @@ async function checkFirestore() {
   }
 }
 
-async function checkAnthropic() {
+// Every model the app depends on — keep in sync with search.js / home-feed.js
+const MODELS = { free: 'claude-haiku-4-5-20251001', premium: 'claude-sonnet-4-6' };
+
+async function checkAnthropic(model = MODELS.free) {
   try {
     if (!process.env.ANTHROPIC_API_KEY) return { status: 'fail', message: 'ANTHROPIC_API_KEY not set' };
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model,
       max_tokens: 10,
       messages: [{ role: 'user', content: 'ping' }],
     });
-    return { status: 'pass', message: 'Anthropic API reachable' };
+    return { status: 'pass', message: `${model} reachable` };
   } catch (e) {
-    return { status: 'fail', message: `Anthropic error: ${e.message}` };
+    return { status: 'fail', message: `${model} error: ${e.message}` };
+  }
+}
+
+async function checkGooglePlaces() {
+  try {
+    const key = process.env.GOOGLE_PLACES_KEY;
+    if (!key) return { status: 'fail', message: 'GOOGLE_PLACES_KEY not set' };
+    const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': 'places.id' },
+      body: JSON.stringify({ textQuery: 'Carnitas Uruapan Chicago', maxResultCount: 1 }),
+    });
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      return { status: 'fail', message: `Google Places ${r.status}: ${body?.error?.status || ''} ${body?.error?.message || ''}`.trim() };
+    }
+    return { status: 'pass', message: 'Google Places (New) reachable' };
+  } catch (e) {
+    return { status: 'fail', message: `Google Places error: ${e.message}` };
   }
 }
 
@@ -68,14 +90,16 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Sabor-Key');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const [appKey, firestore, anthropic, envVars] = await Promise.all([
+  const [appKey, firestore, anthropic, anthropicPremium, googlePlaces, envVars] = await Promise.all([
     checkAppKey(req),
     checkFirestore(),
-    checkAnthropic(),
+    checkAnthropic(MODELS.free),
+    checkAnthropic(MODELS.premium),
+    checkGooglePlaces(),
     checkEnvVars(),
   ]);
 
-  const checks = { appKey, firestore, anthropic, envVars };
+  const checks = { appKey, firestore, anthropic, anthropicPremium, googlePlaces, envVars };
   const allPass = Object.values(checks).every(c => c.status === 'pass' || c.status === 'warn');
   const overall = allPass ? 'healthy' : 'degraded';
 
